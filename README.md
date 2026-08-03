@@ -4,7 +4,7 @@
 
 HTMLファイル1つで動きます。インストールもアカウント登録も要りません。
 
-**→ [ツールを開く](https://example.github.io/community-checkup/)**（公開後にURLを差し替える）
+**→ [ツールを開く](https://shinshingooo.github.io/community-checkup/)**
 
 ---
 
