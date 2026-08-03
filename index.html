@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>次に声をかける3人 — コミュニティ分析ツール</title>
+<style>
+  :root{--bg:#0d1117;--panel:#141a22;--line:#212932;--fg:#e6edf3;--muted:#7d8a99;
+        --blue:#58a6ff;--red:#ff6b6b;--amber:#e3b341;--green:#56d364;--purple:#bc8cff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);line-height:1.75;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto;padding:48px 20px 100px}
+  header{border-left:4px solid var(--blue);padding-left:20px;margin-bottom:34px}
+  h1{font-size:31px;margin:0 0 10px}
+  .lead{color:var(--muted);font-size:15px;margin:0}
+  h2{font-size:19px;margin:46px 0 12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .hint{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+  label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+  input[type=number]{width:100%;background:#0b0f14;border:1px solid var(--line);color:var(--fg);
+    border-radius:8px;padding:11px 13px;font-size:17px;font-family:inherit}
+  textarea{width:100%;min-height:150px;background:#0b0f14;border:1px solid var(--line);
+    color:var(--fg);border-radius:8px;padding:13px;font-size:13px;
+    font-family:ui-monospace,monospace;resize:vertical}
+  input:focus,textarea:focus{outline:none;border-color:var(--blue)}
+  #drop{border:2px dashed var(--line);border-radius:12px;padding:40px 20px;text-align:center;
+    cursor:pointer;transition:.15s;background:#0b0f14}
+  #drop:hover,#drop.over{border-color:var(--blue);background:#0e1620}
+  #drop .big{font-size:16px;font-weight:700}
+  #drop .sm{font-size:12.5px;color:var(--muted);margin-top:8px}
+  button{background:var(--blue);color:#06121f;border:0;border-radius:9px;padding:15px 30px;
+    font-size:16px;font-weight:700;font-family:inherit;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  button.sub{background:transparent;color:var(--blue);border:1px solid var(--blue);
+    font-size:13.5px;padding:10px 18px;font-weight:400}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px}
+  .err{color:var(--red);font-size:13px;min-height:18px}
+  .ok{color:var(--green);font-size:13px}
+  details{margin-top:16px}
+  summary{cursor:pointer;color:var(--blue);font-size:13px}
+  #result{display:none;margin-top:54px}
+
+  .card{border:1px solid var(--line);border-radius:12px;padding:22px;margin-top:14px;background:var(--panel)}
+  .card .k{font-size:11.5px;letter-spacing:.16em;font-weight:700}
+  .card h3{margin:8px 0 4px;font-size:21px}
+  .card .why{font-size:13px;color:var(--muted);margin:0 0 16px}
+
+  .person{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+  .person:first-of-type{border-top:0}
+  .rank{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+    font-size:13px;font-weight:800;flex:0 0 auto}
+  .pname{font-weight:700;font-size:15.5px;flex:1;word-break:break-all}
+  .sig{font-size:12px;color:var(--muted);text-align:right;flex:0 0 auto;line-height:1.5}
+  .act{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:14.5px}
+  .act b{color:var(--fg)}
+  .quote{border-left:3px solid var(--line);padding-left:14px;color:var(--muted);
+    font-size:13.5px;margin-top:14px}
+  .empty{color:var(--muted);font-size:14px;padding:6px 0}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .stat .l{font-size:12px;color:var(--muted)}
+  .stat .v{font-size:28px;font-weight:800;margin-top:2px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+  canvas{max-width:100%;border-radius:10px;border:1px solid var(--line);margin-top:16px;display:block}
+  footer{margin-top:74px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>次に声をかける3人</h1>
+  <p class="lead">コミュニティのログから、伸びしろのある人と、離れかけている人を見つけます。</p>
+</header>
+
+<p class="hint">
+  コミュニティは、運営が頑張るほど運営に依存します。<br>
+  必要なのは「一緒に盛り上げてくれる人」を早く見つけて、その人にちゃんと返すことです。<br>
+  このツールは、その候補を発言ログから割り出します。
+</p>
+
+<h2>1. ログを読み込む</h2>
+<div class="panel">
+  <div id="drop">
+    <div class="big">ファイルをドラッグ＆ドロップ</div>
+    <div class="sm">
+      .txt ／ .csv ／ .json ／ .docx に対応（クリックして選ぶこともできます）<br>
+      DiscordChatExporter の書き出し、Discordからのコピー、Wordに貼ったもの、どれでも読めます
+    </div>
+    <input type="file" id="file" accept=".txt,.csv,.json,.docx,.html" style="display:none">
+  </div>
+  <div class="row" style="margin-top:14px">
+    <span class="err" id="fileMsg"></span>
+  </div>
+
+  <details>
+    <summary>ファイルではなく、テキストを貼り付ける</summary>
+    <textarea id="log" style="margin-top:12px" placeholder="Discordのメッセージを選択してコピーし、そのまま貼り付けてください。"></textarea>
+  </details>
+</div>
+
+<h2>2. 運営を外す</h2>
+<p class="hint">
+  運営やコミュニティマネージャーは、投稿するのが仕事です。<br>
+  外さないまま数えると、必ず中核に入って「一部に偏っている」という結果になります。<br>
+  <strong>外したい人にチェックを入れてください。</strong>ボットは自動で外れます。
+</p>
+<div class="panel">
+  <div id="nameBox"><div class="empty" style="color:var(--muted);font-size:14px">
+    ログを読み込むと、ここに名前が並びます。</div></div>
+  <div class="row" style="margin-top:16px">
+    <button class="sub" id="loadNames">貼り付けたテキストから名前を読み込む</button>
+    <span class="ok" id="exMsg"></span>
+  </div>
+</div>
+
+<h2>3. メンバー数<span style="font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;margin-left:8px">任意</span></h2>
+<p class="hint">入れると「まだ一度も話していない人」の人数が出ます。分からなければ空欄で構いません。</p>
+<div class="panel">
+  <input type="number" id="members" min="1" placeholder="例：5000">
+</div>
+
+<div class="row">
+  <button id="run">分析する</button>
+  <label class="toggle"><input type="checkbox" id="anon"> 名前を伏せて表示する</label>
+  <span class="err" id="err"></span>
+</div>
+
+<div id="result">
+
+  <div class="stats" id="stats"></div>
+  <p class="hint" id="exNote" style="margin-top:12px"></p>
+
+  <h2>発言の分布</h2>
+  <p class="hint">上から発言数の多い順です。誰にどれだけ寄りかかっているかが、形で分かります。</p>
+  <div class="panel"><div id="chart"></div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--muted)">
+      <span><i style="display:inline-block;width:11px;height:11px;background:#bc8cff;border-radius:2px;margin-right:5px"></i>中核</span>
+      <span><i style="display:inline-block;width:11px;height:11px;background:#58a6ff;border-radius:2px;margin-right:5px"></i>声をかける候補</span>
+      <span><i style="display:inline-block;width:11px;height:11px;background:#e3b341;border-radius:2px;margin-right:5px"></i>発言が止まった</span>
+      <span><i style="display:inline-block;width:11px;height:11px;background:#3a4655;border-radius:2px;margin-right:5px"></i>その他</span>
+    </div>
+  </div>
+
+  <div class="card" style="border-color:var(--blue)">
+    <div class="k" style="color:var(--blue)">最優先</div>
+    <h3>次に声をかける3人</h3>
+    <p class="why">発言はしているが、まだ中心にはいない。他の人とやり取りしていて、複数の日に顔を出している人です。<strong>ここが伸びしろです。</strong></p>
+    <div id="candidates"></div>
+    <div class="act" id="candAct"></div>
+  </div>
+
+  <div class="card" style="border-color:var(--purple)">
+    <div class="k" style="color:var(--purple)">いま支えてくれている人</div>
+    <h3>中核メンバー</h3>
+    <p class="why">この人たちが抜けると、コミュニティは目に見えて盛り上がらなくなります。</p>
+    <div id="core"></div>
+    <div class="act" id="coreAct"></div>
+  </div>
+
+  <div class="card" style="border-color:var(--amber)">
+    <div class="k" style="color:var(--amber)">予兆</div>
+    <h3>発言が止まっている人</h3>
+    <p class="why">期間の前半には話していたのに、後半で発言が途切れた人です。人数が減る前に、まずここに出ます。</p>
+    <div id="fading"></div>
+    <div class="act" id="fadeAct"></div>
+  </div>
+
+  <div class="card" id="oneShotCard" style="border-color:var(--line)">
+    <div class="k" style="color:var(--muted)">最初の一歩で終わっている</div>
+    <h3>一度だけ話して、戻ってきていない人</h3>
+    <p class="why">1回発言したきり、その後は出てきていない人です。離脱の予兆というより、<strong>最初の1回に返事がつかなかった</strong>ケースがほとんどです。</p>
+    <div id="oneShot"></div>
+    <div class="act" id="oneShotAct"></div>
+  </div>
+
+  <div class="card" id="silentCard">
+    <div class="k" style="color:var(--muted)">まだ一度も話していない人</div>
+    <h3 id="silentNum"></h3>
+    <p class="why" id="silentWhy"></p>
+    <div class="act" id="silentAct"></div>
+  </div>
+
+  <h2>結果を画像で保存する</h2>
+  <p class="hint">名前は含めません。人数と割合だけを書き出します。</p>
+  <canvas id="cv" width="1600" height="900"></canvas>
+  <div class="row"><button class="sub" id="dl">画像をダウンロード</button></div>
+</div>
+
+<footer>
+  <b style="color:var(--fg)">「話題を出す人」などの役割について</b><br>
+  発言の中身から、日本語の言い回しと会話の並びで推定しています。あくまで傾向で、外れることもあります。
+  最終的にはご自身の目で確かめてください。<br>
+  この判定は、生成AIに文章を送って行っているわけではありません。ログを外に出さないためです。<br><br>
+  すべてブラウザの中だけで計算しています。ログはどこにも送信されず、保存もされません。<br>
+  画像の書き出しには個人名を含めません。画面のスクリーンショットを共有する場合は「名前を伏せて表示する」を使ってください。
+</footer>
+
+</div>
+
+<script>
+/* ==========================================================================
+   1. 読み込み  — 形式が違っても「誰が・いつ」だけ取れれば分析できる
+   ========================================================================== */
+const BOT_RE = /(アプリ|\bAPP\b|\bBOT\b|MEE6|Bot$)/i;
+
+function cleanName(n){
+  // 「username [ロール名],」のようなロール表記と末尾のカンマを落とす
+  return n.replace(/\s*\[[^\]]*\]\s*/g,' ').replace(/[,\s]+$/,'').trim();
+}
+
+// --- Discordの画面コピー（テキスト） -------------------------------------
+function parsePlain(raw){
+  const lines = raw.replace(/⁠/g,'').split(/\r?\n/).map(s=>s.trim());
+  const out = [];
+  const isTs = s => /^\d{4}[\/-]\d{1,2}[\/-]\d{1,2}|^(今日|昨日|Today|Yesterday)/.test(s);
+
+  // 形式A： author / — / 日時 / 本文
+  for(let i=1;i<lines.length-1;i++){
+    if(lines[i] !== '—') continue;
+    if(!isTs(lines[i+1] || '')) continue;
+    const a = cleanName(lines[i-1] || '');
+    if(a) out.push({author:a, ts:lines[i+1], body:lines[i+2] || ''});
+  }
+  if(out.length) return out;
+
+  // 形式B： 「author — 2026/05/14 12:02」が1行に入る
+  let cur = null;
+  for(const l of lines){
+    const m = l.match(/^(.+?)\s+—\s+(\d{4}[\/-]\d{1,2}[\/-]\d{1,2}[^\n]*|今日[^\n]*|昨日[^\n]*)$/);
+    if(m){
+      cur = {author:cleanName(m[1]), ts:m[2], body:''};
+      out.push(cur);
+    }else if(cur && l){
+      cur.body += (cur.body ? ' ' : '') + l;
+    }
+  }
+  return out;
+}
+
+// --- DiscordChatExporter の JSON ------------------------------------------
+function parseJSON(text){
+  const j = JSON.parse(text);
+  const arr = Array.isArray(j) ? j : (j.messages || []);
+  return arr.map(m => ({
+    author: cleanName((m.author && (m.author.nickname || m.author.name)) || m.author || ''),
+    ts: m.timestamp || m.timestampEdited || '',
+    body: m.content || '',
+    bot: !!(m.author && m.author.isBot)
+  })).filter(m => m.author);
+}
+
+// --- CSV（Author, Date, Content の並びを想定） -----------------------------
+function parseCSV(text){
+  const rows = csvRows(text);
+  if(!rows.length) return [];
+  const head = rows[0].map(h => h.toLowerCase());
+  const ia = head.findIndex(h => /author|name|user|投稿者|名前/.test(h));
+  const it = head.findIndex(h => /date|time|日時|日付/.test(h));
+  const ic = head.findIndex(h => /content|message|本文|内容/.test(h));
+  if(ia < 0) return [];
+  return rows.slice(1).filter(r => r[ia]).map(r => ({
+    author: cleanName(r[ia]), ts: it >= 0 ? r[it] : '', body: ic >= 0 ? (r[ic]||'') : ''
+  }));
+}
+function csvRows(t){
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cell); cell=''; }
+    else if(c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+    else if(c!=='\r') cell+=c;
+  }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x!==''));
+}
+
+// --- .docx（Wordに貼ったログ）— ブラウザ標準の展開機能だけで読む -----------
+async function docxText(buf){
+  const dv = new DataView(buf);
+  // ZIPの中央ディレクトリを末尾から探し、word/document.xml だけを取り出す
+  let eocd = -1;
+  for(let i = buf.byteLength - 22; i >= 0 && i > buf.byteLength - 66000; i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error('zip');
+  let p = dv.getUint32(eocd + 16, true);
+  const n = dv.getUint16(eocd + 10, true);
+  for(let k = 0; k < n; k++){
+    const nameLen = dv.getUint16(p + 28, true);
+    const extLen  = dv.getUint16(p + 30, true);
+    const cmtLen  = dv.getUint16(p + 32, true);
+    const method  = dv.getUint16(p + 10, true);
+    const size    = dv.getUint32(p + 20, true);
+    const off     = dv.getUint32(p + 42, true);
+    const name    = new TextDecoder().decode(new Uint8Array(buf, p + 46, nameLen));
+    if(name === 'word/document.xml'){
+      const lnLen = dv.getUint16(off + 26, true);
+      const leLen = dv.getUint16(off + 28, true);
+      const start = off + 30 + lnLen + leLen;
+      const data  = new Uint8Array(buf, start, size);
+      let xmlBuf;
+      if(method === 0){ xmlBuf = data; }
+      else{
+        const ds = new DecompressionStream('deflate-raw');
+        const ab = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+        xmlBuf = new Uint8Array(ab);
+      }
+      let xml = new TextDecoder().decode(xmlBuf);
+      xml = xml.replace(/<\/w:p>/g, '\n');
+      const txt = xml.replace(/<[^>]+>/g, '');
+      const d = document.createElement('textarea'); d.innerHTML = txt;
+      return d.value;
+    }
+    p += 46 + nameLen + extLen + cmtLen;
+  }
+  throw new Error('document.xml が見つかりません');
+}
+
+async function readFile(f){
+  const name = f.name.toLowerCase();
+  if(name.endsWith('.docx')) return parsePlain(await docxText(await f.arrayBuffer()));
+  const text = await f.text();
+  if(name.endsWith('.json')) return parseJSON(text);
+  if(name.endsWith('.csv'))  return parseCSV(text);
+  if(name.endsWith('.html')){
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    return parsePlain(doc.body.innerText || doc.body.textContent || '');
+  }
+  return parsePlain(text);
+}
+
+/* ==========================================================================
+   2. UI（ファイル受け取り）
+   ========================================================================== */
+let loaded = null;
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const fileMsg = document.getElementById('fileMsg');
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over');
+  if(e.dataTransfer.files[0]) take(e.dataTransfer.files[0]); };
+fileInput.onchange = e => { if(e.target.files[0]) take(e.target.files[0]); };
+
+async function take(f){
+  fileMsg.className = 'err'; fileMsg.textContent = '読み込み中…';
+  try{
+    const msgs = await readFile(f);
+    if(!msgs.length) throw new Error('メッセージを読み取れませんでした');
+    loaded = msgs;
+    fileMsg.className = 'ok';
+    fileMsg.textContent = `${f.name} を読み込みました（${msgs.length}件）`;
+    refreshNames(msgs);
+  }catch(err){
+    loaded = null;
+    fileMsg.className = 'err';
+    fileMsg.textContent = 'この形式は読み取れませんでした。テキストとして貼り付けてみてください。';
+  }
+}
+
+/* --- 除外リスト ---------------------------------------------------------- */
+// 運営・公式・管理者は最初からチェックを入れておく。外し忘れが一番多いため。
+const STAFF_RE = /(運営|公式|管理|オーナー|マネージャ|コミュマネ|中の人|owner|admin|moderator|\bmod\b|staff|founder|manager|\bcm\b|代表)/i;
+let excluded = new Set();
+
+function refreshNames(msgs){
+  const c = new Map();
+  for(const m of msgs){
+    if(m.bot || BOT_RE.test(m.author)) continue;
+    c.set(m.author, (c.get(m.author) || 0) + 1);
+  }
+  const arr = [...c.entries()].sort((a,b) => b[1] - a[1]);
+  if(!arr.length) return;
+
+  // 前回の選択は残しつつ、運営らしき名前は自動でチェック
+  for(const [n] of arr) if(STAFF_RE.test(n)) excluded.add(n);
+
+  document.getElementById('nameBox').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">` +
+    arr.map(([n, k]) => {
+      const on = excluded.has(n) ? 'checked' : '';
+      return `<label class="toggle" style="color:var(--fg);font-size:14px">
+        <input type="checkbox" class="exBox" data-n="${escapeHtml(n)}" ${on}>
+        <span style="flex:1;word-break:break-all">${escapeHtml(n)}</span>
+        <span style="color:var(--muted);font-size:12px">${k}件</span>
+      </label>`;
+    }).join('') + `</div>`;
+
+  document.querySelectorAll('.exBox').forEach(b => {
+    b.onchange = () => {
+      const n = b.dataset.n;
+      b.checked ? excluded.add(n) : excluded.delete(n);
+      updateExMsg();
+      if(R) document.getElementById('run').click();   // 分析済みなら即座に計算し直す
+    };
+  });
+  updateExMsg();
+}
+
+function updateExMsg(){
+  const el = document.getElementById('exMsg');
+  el.textContent = excluded.size ? `${excluded.size}人を計算から外します` : '';
+}
+
+document.getElementById('loadNames').onclick = () => {
+  const raw = document.getElementById('log').value.trim();
+  if(!raw){ document.getElementById('exMsg').textContent = ''; return; }
+  const msgs = parsePlain(raw);
+  if(msgs.length) refreshNames(msgs);
+};
+
+/* ==========================================================================
+   3. 分析  — 「誰に何をするか」を出すのが目的。状態を測るのは手段
+   ========================================================================== */
+/* --- 発言の中身から「その人が何をしている人か」を推定する ------------------
+   LLMには投げない。ログを外に出さないという約束を守るため、日本語の型で判定する。
+   断定はできないので、あくまで「傾向」として出す。                          */
+const PAT = {
+  question: /[?？]|ですか|でしょうか|ますか|教えて|分かる方|わかる方|知ってる|知りませんか|どうやって|どうすれば|どなたか/,
+  welcome:  /はじめまして|初めまして|ようこそ|よろしくお願い|よろしくです|参加しました|入りました|新しく/,
+  thanks:   /ありがとう|あざす|感謝|助かり|お世話に/,
+  praise:   /すごい|さすが|お疲れ|おめでとう|素晴らし|いいね|ナイス/,
+  guide:    /やり方|手順|まずは|おすすめ|参考に|こちら|リンク|チャンネル|見てみて|使うと|できます|方法は/
+};
+
+function roleOf(p){
+  // 一番強く出ている傾向を1つだけ返す。弱ければ判定しない。
+  const c = [
+    ['話題を出す人',   p.starter,  '会話の起点になっている'],
+    ['答える人',       p.answers,  '質問に反応している'],
+    ['迎える人',       p.welcomes, '新しい人に声をかけている'],
+    ['繋ぐ人',         p.uniqOut,  '複数の人に話しかけている'],
+    ['場を温める人',   p.praises,  'ねぎらい・称賛が多い'],
+    ['頼られている人', p.thanked,  '他の人から感謝されている']
+  ].sort((a,b) => b[1] - a[1]);
+  if(c[0][1] < 2) return null;
+  return {name:c[0][0], why:c[0][2], n:c[0][1]};
+}
+
+function analyze(msgs){
+  const people = new Map();
+  const P = a => {
+    if(!people.has(a)) people.set(a, {name:a, n:0, days:new Set(), out:0, inn:0,
+      first:null, last:null, starter:0, answers:0, welcomes:0, praises:0,
+      thanked:0, asks:0, short:0, outTo:new Set(), uniqOut:0});
+    return people.get(a);
+  };
+  // ボットと、運営として外した人を除く。残りが「メンバーの動き」
+  const noBot = msgs.filter(m => !(m.bot || BOT_RE.test(m.author)));
+  const real = noBot.filter(m => !excluded.has(m.author));
+  const botCount = msgs.length - noBot.length;
+  const exCount = noBot.length - real.length;
+
+  // 日付の並びを作る（形式がまちまちなので、順番だけ使えれば十分）
+  const dayKey = ts => (String(ts).match(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/) || [String(ts)])[0];
+  const dayList = [...new Set(real.map(m => dayKey(m.ts)))];
+
+  real.forEach((m, i) => {
+    const p = P(m.author);
+    p.n++; p.days.add(dayKey(m.ts));
+    if(p.first === null) p.first = i;
+    p.last = i;
+  });
+
+  // メンションの往来＝関係を作ろうとしている signal
+  const names = [...people.keys()];
+  const mentionsIn = real.map(m => {
+    const b = m.body || '', hit = [];
+    for(const nm of names){
+      if(nm === m.author) continue;
+      const key = nm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      if(new RegExp('@?' + key).test(b)) hit.push(nm);
+    }
+    return hit;
+  });
+  real.forEach((m, i) => {
+    for(const nm of mentionsIn[i]){
+      const p = P(m.author);
+      p.out++; p.outTo.add(nm); P(nm).inn++;
+    }
+  });
+
+  // 中身の型を数える
+  const firstSeen = new Map();
+  real.forEach((m, i) => { if(!firstSeen.has(m.author)) firstSeen.set(m.author, i); });
+
+  real.forEach((m, i) => {
+    const p = P(m.author), b = m.body || '';
+    if(b.length <= 15) p.short++;
+    if(PAT.question.test(b)) p.asks++;
+    if(PAT.praise.test(b))  p.praises++;
+
+    // 話題を出す人：日が変わって最初の発言、または前が自分以外で十分に長い発言
+    const prev = real[i-1];
+    const dk = ts => (String(ts).match(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/) || [String(ts)])[0];
+    if(!prev || dk(prev.ts) !== dk(m.ts)){
+      if(!PAT.question.test(b) && b.length >= 20) p.starter++;
+    }
+
+    // 答える人：直前3件以内に他人の質問があり、それに続けて反応している
+    for(let k = Math.max(0, i-3); k < i; k++){
+      const q = real[k];
+      if(q.author === m.author) continue;
+      if(!PAT.question.test(q.body || '')) continue;
+      if(mentionsIn[i].includes(q.author) || (i - k) === 1){ p.answers++; break; }
+    }
+
+    // 迎える人：歓迎の言葉を使うか、その回に初めて現れた人へ反応している
+    if(PAT.welcome.test(b)) p.welcomes++;
+    for(const nm of mentionsIn[i]){
+      if(firstSeen.get(nm) !== undefined && i - firstSeen.get(nm) <= 2) p.welcomes++;
+    }
+
+    // 頼られている人：感謝の言葉つきで名前を呼ばれた回数
+    if(PAT.thanks.test(b)){
+      for(const nm of mentionsIn[i]) P(nm).thanked++;
+    }
+  });
+
+  for(const p of people.values()){
+    p.uniqOut = p.outTo.size;
+    p.role = roleOf(p);
+  }
+
+  const arr = [...people.values()].sort((a,b) => b.n - a.n);
+  const total = arr.reduce((s,p) => s+p.n, 0);
+
+  // 中核：発言数の上位から積み上げて全体の50%に達するまで。最大5人
+  const core = [];
+  let acc = 0;
+  for(const p of arr){
+    if(acc >= total * 0.5 || core.length >= 5) break;
+    core.push(p); acc += p.n;
+  }
+  const coreSet = new Set(core.map(p => p.name));
+
+  // 期間の前半に出ていて、後半に出ていない人
+  // 2回以上話していた人は「止まった」＝離脱の予兆。
+  // 1回きりの人は「戻ってきていない」＝最初の一歩で終わっている。原因が違うので分ける。
+  const half = Math.floor(real.length / 2);
+  const gone = arr.filter(p => !coreSet.has(p.name) && p.first < half && p.last < half);
+  const fading  = gone.filter(p => p.n >= 2);
+  const oneShot = gone.filter(p => p.n === 1);
+  const fadeSet = new Set(gone.map(p => p.name));
+
+  // 盛り上げ候補：中核でも離脱でもない人を、関係シグナルで並べる
+  const cand = arr
+    .filter(p => !coreSet.has(p.name) && !fadeSet.has(p.name))
+    .map(p => ({...p, score: p.days.size*3 + p.out*3 + p.inn*3 + p.n}))
+    .sort((a,b) => b.score - a.score || b.n - a.n)
+    .slice(0, 3);
+
+  return {
+    people: arr, total, botCount, exCount, core, fading, oneShot, cand,
+    speakers: arr.length, days: dayList.length,
+    coreShare: total ? Math.round(core.reduce((s,p)=>s+p.n,0) / total * 100) : 0
+  };
+}
+
+/* ==========================================================================
+   4. 表示
+   ========================================================================== */
+let R = null;
+
+function label(p, i){
+  return document.getElementById('anon').checked
+    ? String.fromCharCode(65 + i) + 'さん'
+    : p.name;
+}
+
+function personRow(p, i, color, sig){
+  const r = p.role
+    ? `<span style="display:inline-block;font-size:11.5px;color:${color};border:1px solid ${color};
+        border-radius:4px;padding:0 7px;margin-left:8px;vertical-align:middle">${p.role.name}</span>`
+    : '';
+  const why = p.role ? `<div style="font-size:12px;color:var(--muted);font-weight:400">${p.role.why}</div>` : '';
+  return `<div class="person">
+    <div class="rank" style="background:${color};color:#06121f">${i+1}</div>
+    <div class="pname">${escapeHtml(label(p, i))}${r}${why}</div>
+    <div class="sig">${sig}</div>
+  </div>`;
+}
+
+/* 発言の分布（外部ライブラリを使わず、SVGを直接組む） */
+function chart(r){
+  const rows = r.people.slice(0, 15);
+  if(!rows.length) return '';
+  const coreSet = new Set(r.core.map(p=>p.name));
+  const candSet = new Set(r.cand.map(p=>p.name));
+  const goneSet = new Set([...r.fading, ...r.oneShot].map(p=>p.name));
+  const max = rows[0].n;
+  const H = 34, W = 700, labelW = 190, barW = W - labelW - 54;
+
+  const bars = rows.map((p, i) => {
+    const col = coreSet.has(p.name) ? '#bc8cff'
+              : candSet.has(p.name) ? '#58a6ff'
+              : goneSet.has(p.name) ? '#e3b341' : '#3a4655';
+    const w = Math.max(3, p.n / max * barW);
+    const y = i * H;
+    const nm = label(p, i);
+    const disp = nm.length > 12 ? nm.slice(0, 12) + '…' : nm;
+    return `<text x="${labelW-12}" y="${y+21}" text-anchor="end" font-size="13"
+              fill="#e6edf3">${escapeHtml(disp)}</text>
+            <rect x="${labelW}" y="${y+7}" width="${w}" height="16" rx="3" fill="${col}"/>
+            <text x="${labelW+w+10}" y="${y+21}" font-size="12.5" fill="#7d8a99">${p.n}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${rows.length*H}" width="100%"
+            style="max-height:${rows.length*H}px" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
+}
+function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+document.getElementById('run').onclick = () => {
+  const err = document.getElementById('err'); err.textContent = '';
+  let msgs = loaded;
+  if(!msgs){
+    const raw = document.getElementById('log').value.trim();
+    if(!raw){ err.textContent = 'ログを読み込むか、貼り付けてください。'; return; }
+    msgs = parsePlain(raw);
+    if(msgs.length && !document.querySelector('.exBox')) refreshNames(msgs);
+  }
+  if(!msgs || !msgs.length){ err.textContent = 'メッセージを読み取れませんでした。'; return; }
+  if(!msgs.some(m => !(m.bot || BOT_RE.test(m.author)) && !excluded.has(m.author))){
+    err.textContent = '全員を除外しています。チェックを外してください。'; return;
+  }
+
+  R = analyze(msgs);
+  R.members = Number(document.getElementById('members').value) || null;
+  show();
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({behavior:'smooth'});
+};
+document.getElementById('anon').onchange = () => { if(R) show(); };
+
+function show(){
+  const r = R;
+
+  document.getElementById('stats').innerHTML = [
+    ['話した人', r.speakers + '人'],
+    ['発言', r.total + '件'],
+    ['期間', r.days + '日'],
+    ['中核が占める割合', r.coreShare + '%']
+  ].map(([l,v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+
+  document.getElementById('chart').innerHTML = chart(r);
+
+  const ex = document.getElementById('exNote');
+  const parts = [];
+  if(r.exCount) parts.push(`運営として外した発言 ${r.exCount}件`);
+  if(r.botCount) parts.push(`ボット ${r.botCount}件`);
+  ex.textContent = parts.length ? `（${parts.join('／')}を除いて計算しています）` : '';
+
+  // 候補
+  const cEl = document.getElementById('candidates');
+  if(r.cand.length){
+    cEl.innerHTML = r.cand.map((p,i) => personRow(p, i, 'var(--blue)',
+      `${p.n}件 ／ ${p.days.size}日<br>やり取り ${p.out + p.inn}回`)).join('');
+    document.getElementById('candAct').innerHTML =
+      `<b>やること：</b>この方たちに、名前を呼んで話しかけてください。<br>
+       「いつも来てくれてありがとう」ではなく、<b>その人にしか言えないこと</b>を1つ。
+       前の発言を引用して返すのが一番早いです。<br>
+       そのうえで、役割を1つ渡してください。人は、任されると残ります。
+       <div class="quote">運営じゃないのにチャットを盛り上げてくれる方がいました。ありがたいな、で終わらせてた。
+       でもその方たちも、成長とか収益とか、何かを期待して動いてくれてた。好意に甘える設計は、いつか止まります。</div>`;
+  }else{
+    cEl.innerHTML = `<div class="empty">候補が見つかりませんでした。発言している人が中核に偏っているか、ログの期間が短い可能性があります。もう少し長い期間で試してください。</div>`;
+    document.getElementById('candAct').innerHTML = '';
+  }
+
+  // 中核
+  document.getElementById('core').innerHTML = r.core.length
+    ? r.core.map((p,i) => personRow(p, i, 'var(--purple)',
+        `${p.n}件<br>全体の ${Math.round(p.n/r.total*100)}%`)).join('')
+    : `<div class="empty">中核と呼べる人がまだいません。</div>`;
+  document.getElementById('coreAct').innerHTML =
+    `<b>やること：</b>この方たちが、このコミュニティにいて<b>何を得られているか</b>を書き出してください。<br>
+     「ありがとう」しか出てこないなら、そこが原因です。
+     成長でも、収益でも、人脈でもいい。<b>貢献した人が報われる設計をするのは運営の責任です。</b>
+     ${r.coreShare >= 60 ? `<div class="quote">いま上位が全発言の${r.coreShare}%を占めています。この中の1人が抜けるだけで、体感では大きく盛り上がらなくなります。</div>` : ''}`;
+
+  // 発言が止まっている人
+  document.getElementById('fading').innerHTML = r.fading.length
+    ? r.fading.slice(0,5).map((p,i) => personRow(p, i, 'var(--amber)',
+        `${p.n}件<br>後半は発言なし`)).join('')
+    : `<div class="empty">期間の後半で発言が途切れた人はいません。</div>`;
+  document.getElementById('fadeAct').innerHTML = r.fading.length
+    ? `<b>やること：</b>この方たちが最後に何を話していたかを、遡って読んでください。<br>
+       多くの場合、<b>返事がつかなかった発言</b>が最後になっています。<br>
+       いま返しても遅くありません。1件返すだけで戻ってくる人はいます。
+       <div class="quote">6ヶ月かけて5,000人。セール延期から1週間で500人。
+       集まるのは1日28人、離れるのは1日71人でした。人数が減る前に、まず発言が止まります。</div>`
+    : `<b>やること：</b>いまのところ予兆は出ていません。来週また同じログで測ってください。<br>
+       大事なのは1回の結果ではなく、前の週からどう動いたかです。`;
+
+  // 一度だけ話して戻ってきていない人
+  const osc = document.getElementById('oneShotCard');
+  if(r.oneShot.length){
+    osc.style.display = '';
+    document.getElementById('oneShot').innerHTML =
+      r.oneShot.slice(0,5).map((p,i) => personRow(p, i, 'var(--muted)', '1件のみ')).join('')
+      + (r.oneShot.length > 5 ? `<div class="empty">ほか ${r.oneShot.length - 5}人</div>` : '');
+    document.getElementById('oneShotAct').innerHTML =
+      `<b>やること：</b>この方たちの最初の発言に、いま返事をしてください。<br>
+       ほとんどの場合、<b>その1件に誰も反応していません。</b>返事がつかなかった人は、二度目を書きません。<br>
+       仕組みで直すなら、新しい人が答えるだけで済む問いを1つ置いてください。
+       雑談チャンネルは「誰でも話していい」ぶん、誰も最初の1人になれません。
+       <div class="quote">人が定着しないコミュニティは、だいたい「楽しくない」が理由じゃない。
+       参加しても得られるものがないから離れていきます。</div>`;
+  }else{
+    osc.style.display = 'none';
+  }
+
+  // 未着火
+  const sc = document.getElementById('silentCard');
+  if(r.members && r.members > r.speakers){
+    const silent = r.members - r.speakers;
+    const rate = Math.round(r.speakers / r.members * 100);
+    sc.style.display = '';
+    document.getElementById('silentNum').textContent = `${silent.toLocaleString()}人`;
+    document.getElementById('silentWhy').innerHTML =
+      `メンバー ${r.members.toLocaleString()}人のうち、この期間に話したのは ${r.speakers}人（<b>${rate}%</b>）でした。`;
+    document.getElementById('silentAct').innerHTML =
+      `<b>やること：</b>この人数を、コミュニティの規模だと思わないでください。<br>
+       いまの実際の大きさは <b>${r.speakers}人</b> です。人数を追うのをやめて、
+       その ${r.speakers}人に何を返せるかを先に決めるほうが、結果的に速いです。
+       <div class="quote">5,000人のうち、崩れたあと残ったのは1,000人でした。
+       でも振り返ると、最初から話してくれていたのは1,000人だった。
+       いなくなったんじゃなくて、最初から届いてなかったんです。</div>`;
+  }else{
+    sc.style.display = 'none';
+  }
+
+  draw();
+}
+
+/* ==========================================================================
+   5. シェア画像（名前は入れない）
+   ========================================================================== */
+function draw(){
+  const r = R, c = document.getElementById('cv'), x = c.getContext('2d');
+  const F = (s,w=400)=>`${w} ${s}px -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif`;
+  x.fillStyle='#0d1117'; x.fillRect(0,0,1600,900);
+  x.fillStyle='#58a6ff'; x.fillRect(0,0,10,900);
+
+  x.fillStyle='#7d8a99'; x.font=F(32);
+  x.fillText('コミュニティ分析｜次に声をかける人', 100, 96);
+
+  const cells = [
+    ['話した人', r.speakers + '人', '#e6edf3'],
+    ['中核が占める割合', r.coreShare + '%', r.coreShare >= 60 ? '#ff6b6b' : '#56d364'],
+    ['声をかける候補', r.cand.length + '人', '#58a6ff'],
+    ['発言が止まった人', r.fading.length + '人', r.fading.length ? '#e3b341' : '#56d364']
+  ];
+  cells.forEach(([l,v,col], i) => {
+    const cx = 100 + (i % 2) * 760, cy = 210 + Math.floor(i / 2) * 230;
+    x.fillStyle='#7d8a99'; x.font=F(30); x.fillText(l, cx, cy);
+    x.fillStyle=col; x.font=F(88,800); x.fillText(v, cx, cy+100);
+  });
+
+  x.strokeStyle='#212932'; x.lineWidth=2;
+  x.beginPath(); x.moveTo(100,720); x.lineTo(1500,720); x.stroke();
+
+  x.fillStyle='#e6edf3'; x.font=F(40,700);
+  const msg = r.members && r.members > r.speakers
+    ? `${r.members.toLocaleString()}人のうち、話しているのは ${r.speakers}人`
+    : (r.coreShare >= 60 ? '上位数人に、支えられすぎています' : '次に声をかける人が、見つかりました');
+  x.fillText(msg, 100, 800);
+  x.fillStyle='#7d8a99'; x.font=F(28);
+  x.fillText('人数ではなく、動いている人の数がコミュニティの大きさ', 100, 856);
+}
+
+document.getElementById('dl').onclick = () => {
+  const a = document.createElement('a');
+  a.download = 'community-next3.png';
+  a.href = document.getElementById('cv').toDataURL('image/png');
+  a.click();
+};
+</script>
+</body>
+</html>
