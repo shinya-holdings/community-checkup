@@ -16,15 +16,19 @@
   h1{font-size:31px;margin:0 0 10px}
   .lead{color:var(--muted);font-size:15px;margin:0}
   h2{font-size:19px;margin:46px 0 12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .opt{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;
+    padding:1px 6px;margin-left:8px;vertical-align:middle}
   .hint{color:var(--muted);font-size:13.5px;margin:0 0 16px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
   label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
-  input[type=number]{width:100%;background:#0b0f14;border:1px solid var(--line);color:var(--fg);
-    border-radius:8px;padding:11px 13px;font-size:17px;font-family:inherit}
+  input[type=number],input[type=text],input[type=date],select{
+    width:100%;background:#0b0f14;border:1px solid var(--line);color:var(--fg);
+    border-radius:8px;padding:11px 13px;font-size:16px;font-family:inherit}
+  select{padding:9px 11px;font-size:14px}
   textarea{width:100%;min-height:150px;background:#0b0f14;border:1px solid var(--line);
     color:var(--fg);border-radius:8px;padding:13px;font-size:13px;
     font-family:ui-monospace,monospace;resize:vertical}
-  input:focus,textarea:focus{outline:none;border-color:var(--blue)}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue)}
   #drop{border:2px dashed var(--line);border-radius:12px;padding:40px 20px;text-align:center;
     cursor:pointer;transition:.15s;background:#0b0f14}
   #drop:hover,#drop.over{border-color:var(--blue);background:#0e1620}
@@ -35,6 +39,9 @@
   button:hover{filter:brightness(1.08)}
   button.sub{background:transparent;color:var(--blue);border:1px solid var(--blue);
     font-size:13.5px;padding:10px 18px;font-weight:400}
+  button.x{background:transparent;color:var(--muted);border:1px solid var(--line);
+    font-size:13px;padding:10px 14px;font-weight:400}
+  button.x:hover{color:var(--red);border-color:var(--red);filter:none}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px}
   .err{color:var(--red);font-size:13px;min-height:18px}
   .ok{color:var(--green);font-size:13px}
@@ -64,9 +71,31 @@
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
   .stat .l{font-size:12px;color:var(--muted)}
   .stat .v{font-size:28px;font-weight:800;margin-top:2px}
-  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;margin:0}
   canvas{max-width:100%;border-radius:10px;border:1px solid var(--line);margin-top:16px;display:block}
   footer{margin-top:74px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+
+  /* 期間の切り替え（全期間／月） */
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:7px 15px;font-size:13.5px;font-family:inherit;font-weight:400;cursor:pointer}
+  .chip:hover{color:var(--fg);filter:none}
+  .chip.on{background:var(--blue);border-color:var(--blue);color:#06121f;font-weight:700}
+
+  /* 表 */
+  .tblWrap{overflow-x:auto;margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+  th,td{padding:11px 14px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:400;font-size:12.5px;border-top:0}
+  th:first-child,td:first-child{text-align:left}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#0e1620}
+  tbody tr.on{background:#0e1620;box-shadow:inset 3px 0 0 var(--blue)}
+  .up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--muted)}
+
+  /* イベント入力行 */
+  .evRow{display:grid;grid-template-columns:172px 1fr auto;gap:10px;align-items:center;margin-bottom:10px}
+  @media(max-width:640px){.evRow{grid-template-columns:1fr;gap:8px}}
 </style>
 </head>
 <body>
@@ -118,8 +147,31 @@
   </div>
 </div>
 
-<h2>3. メンバー数<span style="font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;margin-left:8px">任意</span></h2>
-<p class="hint">入れると「まだ一度も話していない人」の人数が出ます。分からなければ空欄で構いません。</p>
+<h2>3. イベント<span class="opt">任意</span></h2>
+<p class="hint">
+  イベントの日付と名前を入れると、<strong>その前後でチャットがどう動いたか</strong>を比べます。<br>
+  何件でも追加できます。オフラインの集まり、キャンペーン、企画の告知など、区切りになった日を入れてください。<br>
+  日付だけ入れて名前を空欄にしても構いません。
+</p>
+<div class="panel">
+  <div id="evBox"></div>
+  <div class="row" style="margin-top:4px">
+    <button class="sub" id="addEv">＋ イベントを追加</button>
+    <label class="toggle" style="margin-left:auto">
+      前後
+      <select id="evWin" style="width:auto">
+        <option value="3">3</option>
+        <option value="7" selected>7</option>
+        <option value="14">14</option>
+        <option value="30">30</option>
+      </select>
+      日で比べる
+    </label>
+  </div>
+</div>
+
+<h2>4. メンバー数<span class="opt">任意</span></h2>
+<p class="hint">入れると「まだ一度も発言していない人」の人数が出ます。分からなければ空欄で構いません。</p>
 <div class="panel">
   <input type="number" id="members" min="1" placeholder="例：5000">
 </div>
@@ -132,10 +184,32 @@
 
 <div id="result">
 
+  <h2>日ごとの動き</h2>
+  <p class="hint" id="tlHint">縦の線がイベントの日です。数字は下の一覧と対応しています。</p>
+  <div class="panel" id="tlPanel">
+    <div id="timeline"></div>
+    <div id="evLegend" style="font-size:12.5px;color:var(--muted);margin-top:14px"></div>
+  </div>
+
+  <h2>イベントの前後で、どう動いたか</h2>
+  <p class="hint" id="evHint"></p>
+  <div id="evResult"></div>
+
+  <h2>月ごとの内訳</h2>
+  <p class="hint">
+    行をクリックすると、その月だけの分析に切り替わります。<br>
+    <strong>1か月の結果より、月から月への動きのほうが情報量があります。</strong>
+  </p>
+  <div class="tblWrap"><table id="monthTable"></table></div>
+
+  <h2 id="rangeHead">分析する期間</h2>
+  <p class="hint">下の分析は、ここで選んだ期間だけを対象にします。</p>
+  <div class="chips" id="rangeChips"></div>
+
   <div class="stats" id="stats"></div>
   <p class="hint" id="exNote" style="margin-top:12px"></p>
 
-  <h2>発言の分布</h2>
+  <h2>発言の分布<span class="opt" id="rangeTag2"></span></h2>
   <p class="hint">上から発言数の多い順です。誰にどれだけ寄りかかっているかが、形で分かります。</p>
   <div class="panel"><div id="chart"></div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:var(--muted)">
@@ -148,7 +222,7 @@
 
   <div class="card" style="border-color:var(--blue)">
     <div class="k" style="color:var(--blue)">最優先</div>
-    <h3>次に声をかける3人</h3>
+    <h3>次に声をかける3人<span class="opt" id="rangeTag3"></span></h3>
     <p class="why">発言はしているが、まだ中心にはいない。他の人とやり取りしていて、複数の日に顔を出している人です。<strong>ここが伸びしろです。</strong></p>
     <div id="candidates"></div>
     <div class="act" id="candAct"></div>
@@ -165,24 +239,39 @@
   <div class="card" style="border-color:var(--amber)">
     <div class="k" style="color:var(--amber)">予兆</div>
     <h3>発言が止まっている人</h3>
-    <p class="why">期間の前半には話していたのに、後半で発言が途切れた人です。人数が減る前に、まずここに出ます。</p>
+    <p class="why">期間の前半には発言していたのに、後半で発言が途切れた人です。人数が減る前に、まずここに出ます。</p>
     <div id="fading"></div>
     <div class="act" id="fadeAct"></div>
   </div>
 
   <div class="card" id="oneShotCard" style="border-color:var(--line)">
     <div class="k" style="color:var(--muted)">最初の一歩で終わっている</div>
-    <h3>一度だけ話して、戻ってきていない人</h3>
+    <h3>一度だけ発言して、戻ってきていない人</h3>
     <p class="why">1回発言したきり、その後は出てきていない人です。離脱の予兆というより、<strong>最初の1回に返事がつかなかった</strong>ケースがほとんどです。</p>
     <div id="oneShot"></div>
     <div class="act" id="oneShotAct"></div>
   </div>
 
   <div class="card" id="silentCard">
-    <div class="k" style="color:var(--muted)">まだ一度も話していない人</div>
+    <div class="k" style="color:var(--muted)">まだ一度も発言していない人</div>
     <h3 id="silentNum"></h3>
     <p class="why" id="silentWhy"></p>
     <div class="act" id="silentAct"></div>
+  </div>
+
+  <h2>報告書としてダウンロードする</h2>
+  <p class="hint">
+    ここまでの結果を1つのファイルにまとめます。全期間・月ごと・イベントの前後を、
+    <strong>そのまま渡せる形</strong>で書き出します。<br>
+    HTML はファイル1つで完結し、ブラウザの印刷から PDF にできます。
+  </p>
+  <div class="panel">
+    <div class="row" style="margin-top:0">
+      <button class="sub" id="dlHtml">報告書（HTML）</button>
+      <button class="sub" id="dlMd">報告書（Markdown）</button>
+      <button class="sub" id="openHtml">先に中身を見る</button>
+    </div>
+    <p class="hint" id="reportNote" style="margin:16px 0 0"></p>
   </div>
 
   <h2>結果を画像で保存する</h2>
@@ -196,7 +285,12 @@
   発言の中身から、日本語の言い回しと会話の並びで推定しています。あくまで傾向で、外れることもあります。
   最終的にはご自身の目で確かめてください。<br>
   この判定は、生成AIに文章を送って行っているわけではありません。ログを外に出さないためです。<br><br>
-  すべてブラウザの中だけで計算しています。ログはどこにも送信されず、保存もされません。<br>
+  <b style="color:var(--fg)">日付の扱い</b><br>
+  タイムゾーン付きの日時（DiscordChatExporter の書き出しなど）は、
+  <b>この端末のタイムゾーンに直してから</b>日ごと・月ごとに数えています。
+  海外時刻のまま数えると、深夜の発言が前日に入ってしまうためです。<br><br>
+  すべてブラウザの中だけで計算しています。ログはどこにも送信されず、保存もされません。
+  入力したイベント名・日付も同じで、外には出ません。<br>
   画像の書き出しには個人名を含めません。画面のスクリーンショットを共有する場合は「名前を伏せて表示する」を使ってください。
 </footer>
 
@@ -254,18 +348,40 @@ function parseJSON(text){
   })).filter(m => m.author);
 }
 
-// --- CSV（Author, Date, Content の並びを想定） -----------------------------
+// --- CSV -------------------------------------------------------------------
+/* 列の選び方には注意が要る。
+   DiscordChatExporter の CSV は「AuthorID, Author, Date, Content」の順で、
+   部分一致だけで探すと AuthorID（数字の羅列）を名前として掴んでしまう。
+   実際にそうなっていた。ID列は名前として使わない。 */
+function normHead(h){ return h.trim().toLowerCase().replace(/[\s_\-.]/g,''); }
+function isIdCol(h){ return /id$/.test(h); }
+
+function pickCol(head, exact, loose){
+  // まず見出しそのものが一致するものを探す。無ければ部分一致で拾い、ID列は候補から外す
+  let i = head.findIndex(h => exact.includes(h));
+  if(i >= 0) return i;
+  return head.findIndex(h => loose.test(h) && !isIdCol(h));
+}
+
 function parseCSV(text){
-  const rows = csvRows(text);
+  const rows = csvRows(text.replace(/^﻿/, ''));
   if(!rows.length) return [];
-  const head = rows[0].map(h => h.toLowerCase());
-  const ia = head.findIndex(h => /author|name|user|投稿者|名前/.test(h));
-  const it = head.findIndex(h => /date|time|日時|日付/.test(h));
-  const ic = head.findIndex(h => /content|message|本文|内容/.test(h));
+  const head = rows[0].map(normHead);
+
+  const ia = pickCol(head,
+    ['author','authorname','name','username','user','displayname','nickname','投稿者','名前','表示名','ユーザー名'],
+    /author|name|user|投稿者|名前|ユーザー/);
+  const it = pickCol(head,
+    ['date','datetime','timestamp','time','sentat','日時','日付','投稿日時','送信日時'],
+    /date|time|日時|日付/);
+  const ic = pickCol(head,
+    ['content','message','text','body','本文','内容','メッセージ','発言'],
+    /content|message|text|body|本文|内容|メッセージ|発言/);
+
   if(ia < 0) return [];
   return rows.slice(1).filter(r => r[ia]).map(r => ({
     author: cleanName(r[ia]), ts: it >= 0 ? r[it] : '', body: ic >= 0 ? (r[ic]||'') : ''
-  }));
+  })).filter(m => m.author);
 }
 function csvRows(t){
   const rows=[]; let row=[], cell='', q=false;
@@ -337,7 +453,36 @@ async function readFile(f){
 }
 
 /* ==========================================================================
-   2. UI（ファイル受け取り）
+   2. 日付  — 月ごとの集計とイベント比較は、ここが正しくないと全部ずれる
+   ========================================================================== */
+/* タイムゾーン付きの日時は、実時刻として解釈してから閲覧者のタイムゾーンで日付にする。
+   文字列を正規表現で切ると、UTC表記の深夜の発言が前日・前月に入ってしまう。 */
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+function dateOf(ts){
+  const s = String(ts || '').trim();
+  if(!s) return null;
+  if(/^\d{4}-\d{2}-\d{2}[T ]\d/.test(s)){
+    const d = new Date(s.replace(' ', 'T').replace(/(\.\d{3})\d+/, '$1'));
+    if(!isNaN(d)) return d;
+  }
+  const m = s.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function keyOf(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function dayKey(ts){ const d = dateOf(ts); return d ? keyOf(d) : String(ts || ''); }
+function monthKey(ts){ const d = dateOf(ts); return d ? `${d.getFullYear()}-${pad2(d.getMonth()+1)}` : ''; }
+function monthLabel(k){ const [y,m] = k.split('-'); return `${y}年${Number(m)}月`; }
+function dayLabel(k){ const [,m,d] = k.split('-'); return `${Number(m)}/${Number(d)}`; }
+function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+function parseDateInput(v){
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+
+/* ==========================================================================
+   3. UI（ファイル受け取り）
    ========================================================================== */
 let loaded = null;
 const drop = document.getElementById('drop');
@@ -360,6 +505,7 @@ async function take(f){
     fileMsg.className = 'ok';
     fileMsg.textContent = `${f.name} を読み込みました（${msgs.length}件）`;
     refreshNames(msgs);
+    suggestEventDates(msgs);
   }catch(err){
     loaded = null;
     fileMsg.className = 'err';
@@ -400,7 +546,7 @@ function refreshNames(msgs){
       const n = b.dataset.n;
       b.checked ? excluded.add(n) : excluded.delete(n);
       updateExMsg();
-      if(R) document.getElementById('run').click();   // 分析済みなら即座に計算し直す
+      if(R) rerun();   // 分析済みなら即座に計算し直す
     };
   });
   updateExMsg();
@@ -415,11 +561,50 @@ document.getElementById('loadNames').onclick = () => {
   const raw = document.getElementById('log').value.trim();
   if(!raw){ document.getElementById('exMsg').textContent = ''; return; }
   const msgs = parsePlain(raw);
-  if(msgs.length) refreshNames(msgs);
+  if(msgs.length){ refreshNames(msgs); suggestEventDates(msgs); }
 };
 
+/* --- イベントの入力欄（何件でも足せる） ------------------------------------ */
+const evBox = document.getElementById('evBox');
+
+function addEventRow(date, name){
+  const row = document.createElement('div');
+  row.className = 'evRow';
+  row.innerHTML =
+    `<input type="date" class="evDate" value="${escapeHtml(date || '')}">
+     <input type="text" class="evName" placeholder="イベント名（例：オフ会、キャンペーン開始）" value="${escapeHtml(name || '')}">
+     <button class="x" type="button">削除</button>`;
+  row.querySelector('button').onclick = () => {
+    row.remove();
+    if(!evBox.children.length) addEventRow();
+    if(R) rerun();
+  };
+  evBox.appendChild(row);
+  return row;
+}
+addEventRow();
+document.getElementById('addEv').onclick = () => addEventRow().querySelector('.evDate').focus();
+document.getElementById('evWin').onchange = () => { if(R) rerun(); };
+
+// ログの範囲を日付欄の選べる幅として渡しておくと、範囲外を入れる事故が減る
+function suggestEventDates(msgs){
+  const ds = msgs.map(m => dateOf(m.ts)).filter(Boolean).sort((a,b) => a-b);
+  if(!ds.length) return;
+  const lo = keyOf(ds[0]), hi = keyOf(ds[ds.length-1]);
+  document.querySelectorAll('.evDate').forEach(i => { i.min = lo; i.max = hi; });
+}
+
+function readEvents(){
+  return [...document.querySelectorAll('.evRow')].map((row, i) => {
+    const d = parseDateInput(row.querySelector('.evDate').value);
+    if(!d) return null;
+    const nm = row.querySelector('.evName').value.trim();
+    return {date:d, key:keyOf(d), name:nm || `イベント${i+1}`};
+  }).filter(Boolean).sort((a,b) => a.date - b.date);
+}
+
 /* ==========================================================================
-   3. 分析  — 「誰に何をするか」を出すのが目的。状態を測るのは手段
+   4. 分析  — 「誰に何をするか」を出すのが目的。状態を測るのは手段
    ========================================================================== */
 /* --- 発言の中身から「その人が何をしている人か」を推定する ------------------
    LLMには投げない。ログを外に出さないという約束を守るため、日本語の型で判定する。
@@ -446,6 +631,13 @@ function roleOf(p){
   return {name:c[0][0], why:c[0][2], n:c[0][1]};
 }
 
+// ボットと、運営として外した人を落とす。残りが「メンバーの動き」
+function membersOnly(msgs){
+  const noBot = msgs.filter(m => !(m.bot || BOT_RE.test(m.author)));
+  const real = noBot.filter(m => !excluded.has(m.author));
+  return {real, botCount: msgs.length - noBot.length, exCount: noBot.length - real.length};
+}
+
 function analyze(msgs){
   const people = new Map();
   const P = a => {
@@ -454,14 +646,7 @@ function analyze(msgs){
       thanked:0, asks:0, short:0, outTo:new Set(), uniqOut:0});
     return people.get(a);
   };
-  // ボットと、運営として外した人を除く。残りが「メンバーの動き」
-  const noBot = msgs.filter(m => !(m.bot || BOT_RE.test(m.author)));
-  const real = noBot.filter(m => !excluded.has(m.author));
-  const botCount = msgs.length - noBot.length;
-  const exCount = noBot.length - real.length;
-
-  // 日付の並びを作る（形式がまちまちなので、順番だけ使えれば十分）
-  const dayKey = ts => (String(ts).match(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/) || [String(ts)])[0];
+  const {real, botCount, exCount} = membersOnly(msgs);
   const dayList = [...new Set(real.map(m => dayKey(m.ts)))];
 
   real.forEach((m, i) => {
@@ -501,8 +686,7 @@ function analyze(msgs){
 
     // 話題を出す人：日が変わって最初の発言、または前が自分以外で十分に長い発言
     const prev = real[i-1];
-    const dk = ts => (String(ts).match(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/) || [String(ts)])[0];
-    if(!prev || dk(prev.ts) !== dk(m.ts)){
+    if(!prev || dayKey(prev.ts) !== dayKey(m.ts)){
       if(!PAT.question.test(b) && b.length >= 20) p.starter++;
     }
 
@@ -544,7 +728,7 @@ function analyze(msgs){
   const coreSet = new Set(core.map(p => p.name));
 
   // 期間の前半に出ていて、後半に出ていない人
-  // 2回以上話していた人は「止まった」＝離脱の予兆。
+  // 2回以上発言していた人は「止まった」＝離脱の予兆。
   // 1回きりの人は「戻ってきていない」＝最初の一歩で終わっている。原因が違うので分ける。
   const half = Math.floor(real.length / 2);
   const gone = arr.filter(p => !coreSet.has(p.name) && p.first < half && p.last < half);
@@ -566,15 +750,129 @@ function analyze(msgs){
   };
 }
 
-/* ==========================================================================
-   4. 表示
-   ========================================================================== */
-let R = null;
+/* --- 日ごとの積み上げ ------------------------------------------------------ */
+function dailyIndex(msgs){
+  const {real} = membersOnly(msgs);
+  const byDay = new Map();          // 日 → {n, people:Set}
+  const firstDay = new Map();       // 人 → 初めて発言があった日
+  let lo = null, hi = null;
+  for(const m of real){
+    const d = dateOf(m.ts);
+    if(!d) continue;
+    const k = keyOf(d);
+    if(!byDay.has(k)) byDay.set(k, {n:0, people:new Set()});
+    const e = byDay.get(k);
+    e.n++; e.people.add(m.author);
+    if(!firstDay.has(m.author) || k < firstDay.get(m.author)) firstDay.set(m.author, k);
+    if(!lo || d < lo) lo = d;
+    if(!hi || d > hi) hi = d;
+  }
+  // 発言ゼロの日も並べる。抜けたまま描くと、盛り上がりの落差が見えなくなる
+  const days = [];
+  if(lo){
+    for(let d = new Date(lo); d <= hi; d = addDays(d, 1)) days.push(keyOf(d));
+  }
+  return {byDay, firstDay, days, lo, hi, dated: !!lo};
+}
 
-function label(p, i){
-  return document.getElementById('anon').checked
-    ? String.fromCharCode(65 + i) + 'さん'
-    : p.name;
+/* --- 月ごとの内訳 ---------------------------------------------------------- */
+function monthlyBreakdown(msgs){
+  const {real} = membersOnly(msgs);
+  const months = [...new Set(real.map(m => monthKey(m.ts)).filter(Boolean))].sort();
+  if(!months.length) return [];
+
+  // 「新規発言者」「この月で発言が止まった人」は全期間を通して見ないと出せない
+  const firstM = new Map(), lastM = new Map();
+  for(const m of real){
+    const k = monthKey(m.ts);
+    if(!k) continue;
+    if(!firstM.has(m.author) || k < firstM.get(m.author)) firstM.set(m.author, k);
+    if(!lastM.has(m.author) || k > lastM.get(m.author)) lastM.set(m.author, k);
+  }
+  const lastMonth = months[months.length-1];
+
+  return months.map(k => {
+    const sub = msgs.filter(m => monthKey(m.ts) === k);
+    const a = analyze(sub);
+    let fresh = 0, ended = 0;
+    for(const p of a.people){
+      if(firstM.get(p.name) === k) fresh++;
+      if(lastM.get(p.name) === k && k !== lastMonth) ended++;
+    }
+    return {key:k, label:monthLabel(k), total:a.total, speakers:a.speakers,
+            days:a.days, coreShare:a.coreShare, fresh, ended,
+            cand:a.cand, core:a.core, fading:a.fading};
+  });
+}
+
+/* --- イベントの前後 -------------------------------------------------------- */
+function windowStats(idx, from, to){
+  let n = 0, inRange = 0, days = 0;
+  const sp = new Set();
+  for(let d = new Date(from); d <= to; d = addDays(d, 1)){
+    days++;
+    if(idx.lo && d >= idx.lo && d <= idx.hi) inRange++;
+    const e = idx.byDay.get(keyOf(d));
+    if(e){ n += e.n; e.people.forEach(x => sp.add(x)); }
+  }
+  // ログの期間外は、盛り上がっていなかったのではなく単に見えていない。割らずに数えるため分母を分ける
+  return {n, speakers:sp.size, days, inRange, set:sp,
+          perDay: inRange ? n / inRange : 0};
+}
+
+function eventCompare(idx, events, win){
+  return events.map(ev => {
+    const before = windowStats(idx, addDays(ev.date, -win), addDays(ev.date, -1));
+    const after  = windowStats(idx, addDays(ev.date, 1),  addDays(ev.date, win));
+    const onDay  = windowStats(idx, ev.date, ev.date);
+
+    // イベント後に初めて口を開いた人。イベントが人を連れてきたかを見る唯一の指標
+    let newcomers = 0;
+    for(const nm of after.set){
+      const f = idx.firstDay.get(nm);
+      if(f && f > ev.key) newcomers++;
+    }
+    const diff = before.perDay ? (after.perDay - before.perDay) / before.perDay * 100 : null;
+    const short = (before.days - before.inRange) + (after.days - after.inRange);
+    return {ev, before, after, onDay, newcomers, diff, short,
+            inLog: !!(idx.lo && ev.date >= idx.lo && ev.date <= idx.hi)};
+  });
+}
+
+/* ==========================================================================
+   5. 表示
+   ========================================================================== */
+let MSGS = null;      // 読み込んだ全メッセージ
+let R = null;         // いま表示している期間の分析結果
+let RANGE = 'all';    // 'all' か 'YYYY-MM'
+let MONTHS = [];      // 月ごとの内訳
+let IDX = null;       // 日ごとの積み上げ
+let EVENTS = [];      // 登録されたイベント
+let CMP = [];         // イベント前後の比較
+let WIN = 7;          // 前後何日で比べるか
+
+function rangeLabel(){ return RANGE === 'all' ? '全期間' : monthLabel(RANGE); }
+function inRange(m){ return RANGE === 'all' || monthKey(m.ts) === RANGE; }
+
+/* 伏せ字は「人ごとに固定」でないといけない。
+   リストの中の順番で A・B・C を振ると、表とリストで同じ記号が別人を指す。
+   報告書では突き合わせて読むので、全期間の発言数順で一度だけ割り当てる。 */
+let ALIAS = new Map();
+function letters(i){
+  let s = ''; i++;
+  while(i > 0){ i--; s = String.fromCharCode(65 + i % 26) + s; i = Math.floor(i / 26); }
+  return s;
+}
+function buildAlias(msgs){
+  const c = new Map();
+  for(const m of membersOnly(msgs).real) c.set(m.author, (c.get(m.author) || 0) + 1);
+  ALIAS = new Map([...c.entries()].sort((a,b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .map(([n], i) => [n, letters(i) + 'さん']));
+}
+function isAnon(){ return document.getElementById('anon').checked; }
+function label(p){
+  const n = typeof p === 'string' ? p : p.name;
+  return isAnon() ? (ALIAS.get(n) || '?さん') : n;
 }
 
 function personRow(p, i, color, sig){
@@ -585,15 +883,17 @@ function personRow(p, i, color, sig){
   const why = p.role ? `<div style="font-size:12px;color:var(--muted);font-weight:400">${p.role.why}</div>` : '';
   return `<div class="person">
     <div class="rank" style="background:${color};color:#06121f">${i+1}</div>
-    <div class="pname">${escapeHtml(label(p, i))}${r}${why}</div>
+    <div class="pname">${escapeHtml(label(p))}${r}${why}</div>
     <div class="sig">${sig}</div>
   </div>`;
 }
 
-/* 発言の分布（外部ライブラリを使わず、SVGを直接組む） */
-function chart(r){
+/* 発言の分布（外部ライブラリを使わず、SVGを直接組む）
+   報告書は白地なので、文字色は呼び出し側から渡せるようにしてある */
+function chart(r, skin){
+  const S = Object.assign({fg:'#e6edf3', muted:'#7d8a99'}, skin || {});
   const rows = r.people.slice(0, 15);
-  if(!rows.length) return '';
+  if(!rows.length) return '<div class="empty">この期間に発言がありません。</div>';
   const coreSet = new Set(r.core.map(p=>p.name));
   const candSet = new Set(r.cand.map(p=>p.name));
   const goneSet = new Set([...r.fading, ...r.oneShot].map(p=>p.name));
@@ -606,19 +906,68 @@ function chart(r){
               : goneSet.has(p.name) ? '#e3b341' : '#3a4655';
     const w = Math.max(3, p.n / max * barW);
     const y = i * H;
-    const nm = label(p, i);
+    const nm = label(p);
     const disp = nm.length > 12 ? nm.slice(0, 12) + '…' : nm;
     return `<text x="${labelW-12}" y="${y+21}" text-anchor="end" font-size="13"
-              fill="#e6edf3">${escapeHtml(disp)}</text>
+              fill="${S.fg}">${escapeHtml(disp)}</text>
             <rect x="${labelW}" y="${y+7}" width="${w}" height="16" rx="3" fill="${col}"/>
-            <text x="${labelW+w+10}" y="${y+21}" font-size="12.5" fill="#7d8a99">${p.n}</text>`;
+            <text x="${labelW+w+10}" y="${y+21}" font-size="12.5" fill="${S.muted}">${p.n}</text>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${W} ${rows.length*H}" width="100%"
             style="max-height:${rows.length*H}px" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
 }
-function escapeHtml(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+/* 日ごとの発言数。イベントの日に縦線を立てて、前後の落差を目で見る */
+function timeline(idx, events, skin){
+  const S = Object.assign({muted:'#7d8a99', line:'#212932', bar:'#3a4655', mark:'#e3b341'}, skin || {});
+  const days = idx.days;
+  if(!days.length) return '<div class="empty">日付を読み取れなかったため、日ごとの動きは出せません。</div>';
+
+  const W = 700, H = 190, padL = 38, padR = 12, padT = 22, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const max = Math.max(1, ...days.map(k => (idx.byDay.get(k) || {n:0}).n));
+  const bw = plotW / days.length;
+  const xOf = i => padL + i * bw;
+
+  const bars = days.map((k, i) => {
+    const n = (idx.byDay.get(k) || {n:0}).n;
+    const h = n / max * plotH;
+    return `<rect x="${(xOf(i)).toFixed(2)}" y="${(padT + plotH - h).toFixed(2)}"
+             width="${Math.max(1, bw - 0.8).toFixed(2)}" height="${h.toFixed(2)}"
+             fill="${S.bar}"><title>${k} ${n}件</title></rect>`;
+  }).join('');
+
+  // 月の変わり目に目盛りを置く
+  const ticks = days.map((k, i) => {
+    if(i && k.slice(0,7) === days[i-1].slice(0,7)) return '';
+    return `<line x1="${xOf(i).toFixed(2)}" y1="${padT}" x2="${xOf(i).toFixed(2)}" y2="${padT+plotH}"
+              stroke="${S.line}" stroke-width="1"/>
+            <text x="${(xOf(i)+3).toFixed(2)}" y="${H-8}" font-size="11" fill="${S.muted}">${monthLabel(k.slice(0,7))}</text>`;
+  }).join('');
+
+  const marks = events.map((ev, i) => {
+    const at = days.indexOf(ev.key);
+    if(at < 0) return '';
+    const x = xOf(at) + bw/2;
+    return `<line x1="${x.toFixed(2)}" y1="${padT-8}" x2="${x.toFixed(2)}" y2="${padT+plotH}"
+              stroke="${S.mark}" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <circle cx="${x.toFixed(2)}" cy="${padT-11}" r="9" fill="${S.mark}"/>
+            <text x="${x.toFixed(2)}" y="${padT-7}" font-size="11" font-weight="700"
+              text-anchor="middle" fill="#06121f">${i+1}</text>`;
+  }).join('');
+
+  const axis = `<text x="${padL-8}" y="${padT+6}" font-size="11" fill="${S.muted}" text-anchor="end">${max}</text>
+                <text x="${padL-8}" y="${padT+plotH}" font-size="11" fill="${S.muted}" text-anchor="end">0</text>
+                <line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="${S.line}"/>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">
+            ${ticks}${axis}${bars}${marks}</svg>`;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* --- 実行 ------------------------------------------------------------------ */
 document.getElementById('run').onclick = () => {
   const err = document.getElementById('err'); err.textContent = '';
   let msgs = loaded;
@@ -626,28 +975,241 @@ document.getElementById('run').onclick = () => {
     const raw = document.getElementById('log').value.trim();
     if(!raw){ err.textContent = 'ログを読み込むか、貼り付けてください。'; return; }
     msgs = parsePlain(raw);
-    if(msgs.length && !document.querySelector('.exBox')) refreshNames(msgs);
+    if(msgs.length && !document.querySelector('.exBox')){ refreshNames(msgs); suggestEventDates(msgs); }
   }
   if(!msgs || !msgs.length){ err.textContent = 'メッセージを読み取れませんでした。'; return; }
   if(!msgs.some(m => !(m.bot || BOT_RE.test(m.author)) && !excluded.has(m.author))){
     err.textContent = '全員を除外しています。チェックを外してください。'; return;
   }
 
-  R = analyze(msgs);
-  R.members = Number(document.getElementById('members').value) || null;
-  show();
+  MSGS = msgs;
+  RANGE = 'all';
+  rerun();
   document.getElementById('result').style.display = 'block';
   document.getElementById('result').scrollIntoView({behavior:'smooth'});
 };
-document.getElementById('anon').onchange = () => { if(R) show(); };
+document.getElementById('anon').onchange = () => { if(R) rerun(); };
+
+// 除外・イベント・期間のどれが変わっても、ここを通れば全部そろって描き直る
+function rerun(){
+  if(!MSGS) return;
+  buildAlias(MSGS);
+  MONTHS = monthlyBreakdown(MSGS);
+  if(RANGE !== 'all' && !MONTHS.some(m => m.key === RANGE)) RANGE = 'all';
+
+  IDX = dailyIndex(MSGS);
+  EVENTS = IDX.dated ? readEvents() : [];
+  WIN = Number(document.getElementById('evWin').value) || 7;
+  CMP = EVENTS.length ? eventCompare(IDX, EVENTS, WIN) : [];
+
+  showTimeline(IDX, EVENTS);
+  showEvents(IDX, EVENTS, WIN);
+  showMonths();
+  showRangeChips();
+
+  R = analyze(MSGS.filter(inRange));
+  R.members = Number(document.getElementById('members').value) || null;
+  show();
+}
+
+function showRangeChips(){
+  const box = document.getElementById('rangeChips');
+  const keys = [['all','全期間'], ...MONTHS.map(m => [m.key, m.label])];
+  box.innerHTML = keys.map(([k, l]) =>
+    `<button class="chip ${RANGE===k?'on':''}" data-k="${k}">${l}</button>`).join('');
+  box.querySelectorAll('.chip').forEach(b => {
+    b.onclick = () => { RANGE = b.dataset.k; rerun(); };
+  });
+  document.getElementById('rangeHead').textContent = `分析する期間 — ${rangeLabel()}`;
+  document.getElementById('rangeTag2').textContent = rangeLabel();
+  document.getElementById('rangeTag3').textContent = rangeLabel();
+}
+
+function showMonths(){
+  const t = document.getElementById('monthTable');
+  if(!MONTHS.length){
+    t.innerHTML = `<tbody><tr><td style="cursor:default">日付を読み取れなかったため、月ごとに分けられませんでした。</td></tr></tbody>`;
+    return;
+  }
+  const head = `<thead><tr>
+      <th>月</th><th>発言</th><th>発言した人数</th><th>発言があった日</th>
+      <th>新規発言者</th><th>この月で発言が止まった人</th><th>中核が占める割合</th>
+    </tr></thead>`;
+  const body = MONTHS.map((m, i) => {
+    const prev = MONTHS[i-1];
+    const d = prev && prev.total ? Math.round((m.total - prev.total) / prev.total * 100) : null;
+    // 「43-52%」と読めてしまうので、増減は記号で示す
+    const dTag = d === null ? '' :
+      `<span class="${d>0?'up':d<0?'down':'flat'}" style="font-size:11.5px;margin-left:8px">${d>0?'▲':d<0?'▼':'±'}${Math.abs(d)}%</span>`;
+    return `<tr class="${RANGE===m.key?'on':''}" data-k="${m.key}">
+      <td>${m.label}</td>
+      <td>${m.total}${dTag}</td>
+      <td>${m.speakers}</td>
+      <td>${m.days}</td>
+      <td>${m.fresh}</td>
+      <td>${m.ended || '—'}</td>
+      <td class="${m.coreShare>=60?'down':''}">${m.coreShare}%</td>
+    </tr>`;
+  }).join('');
+  t.innerHTML = head + `<tbody>${body}</tbody>`;
+  t.querySelectorAll('tbody tr').forEach(tr => {
+    tr.onclick = () => { RANGE = tr.dataset.k; rerun();
+      document.getElementById('rangeHead').scrollIntoView({behavior:'smooth', block:'start'}); };
+  });
+}
+
+function showTimeline(idx, events){
+  document.getElementById('timeline').innerHTML = timeline(idx, events);
+  const hint = document.getElementById('tlHint');
+  const leg = document.getElementById('evLegend');
+  if(!idx.dated){
+    hint.textContent = '日付を読み取れませんでした。日ごと・月ごとの集計は出せません。';
+    leg.innerHTML = ''; return;
+  }
+  hint.innerHTML = events.length
+    ? '縦の線がイベントの日です。数字は下の一覧と対応しています。'
+    : '「3. イベント」に日付を入れると、その日に縦の線が入ります。';
+  leg.innerHTML = events.map((ev, i) =>
+    `<div style="margin-bottom:4px"><b style="color:var(--amber)">${i+1}</b>　${ev.key}　${escapeHtml(ev.name)}</div>`
+  ).join('');
+}
+
+function showEvents(idx, events, win){
+  const box = document.getElementById('evResult');
+  const hint = document.getElementById('evHint');
+  if(!idx.dated){
+    hint.textContent = '日付を読み取れないログのため、この比較は出せません。';
+    box.innerHTML = ''; return;
+  }
+  if(!events.length){
+    hint.textContent = '';
+    box.innerHTML = `<div class="card"><div class="empty">
+      「3. イベント」に日付を入れて、もう一度「分析する」を押してください。<br>
+      イベントの前${win}日と後${win}日の平均発言数を並べて、どう動いたかを出します。
+    </div></div>`;
+    return;
+  }
+  hint.innerHTML = `イベントの<b>前${win}日</b>と<b>後${win}日</b>の<b>平均発言数</b>で比較しています。`;
+
+  box.innerHTML = CMP.map((c, i) => {
+    const b = c.before, a = c.after;
+    const dCls = c.diff === null ? 'flat' : c.diff > 0 ? 'up' : c.diff < 0 ? 'down' : 'flat';
+    const dTxt = c.diff === null ? '—' : `${c.diff > 0 ? '+' : ''}${Math.round(c.diff)}%`;
+    const warn = [];
+    if(!c.inLog) warn.push('この日はログの期間の外です。');
+    if(c.short) warn.push(`前後の窓のうち ${c.short}日分がログの期間の外です。その分は数えていません。`);
+    return `<div class="card">
+      <div class="k" style="color:var(--amber)">${i+1}　${c.ev.key}</div>
+      <h3>${escapeHtml(c.ev.name)}</h3>
+      <div class="tblWrap" style="margin-top:14px">
+        <table><thead><tr>
+          <th></th><th>発言</th><th>平均発言数</th><th>発言した人数</th><th>数えた日数</th>
+        </tr></thead><tbody>
+          <tr style="cursor:default"><td>前${win}日</td><td>${b.n}</td><td>${b.perDay.toFixed(1)}</td><td>${b.speakers}</td><td>${b.inRange}</td></tr>
+          <tr style="cursor:default"><td>当日</td><td>${c.onDay.n}</td><td>—</td><td>${c.onDay.speakers}</td><td>1</td></tr>
+          <tr style="cursor:default"><td>後${win}日</td><td>${a.n}</td><td class="${dCls}">${a.perDay.toFixed(1)}</td><td>${a.speakers}</td><td>${a.inRange}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="act">
+        <b>平均発言数：</b><span class="${dCls}" style="font-size:20px;font-weight:800">${dTxt}</span>
+        　／　<b>イベント後の新規発言者：</b>${c.newcomers}人
+        ${warn.length ? `<div class="quote">${warn.join('<br>')}</div>` : ''}
+        ${eventNote(c, win)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 数字を出して終わりにしない。何を見るべきかまで書く
+function eventNote(c, win){
+  if(c.diff === null) return `<div class="quote">前${win}日に発言がないため、比較になりません。もっと前からのログで見てください。</div>`;
+  if(c.newcomers === 0 && c.diff > 20)
+    return `<div class="quote">発言数は増えましたが、<b>新規発言者は0人</b>です。
+      既存のメンバーだけで盛り上がった状態で、輪は広がっていません。
+      次は、初めての人が答えるだけで済む問いを1つ置いてください。</div>`;
+  if(c.diff <= -20)
+    return `<div class="quote">イベント後は発言数が減っています。
+      <b>終わったあとに何も残さなかった</b>ときにこうなります。当日の話を引用して、翌日にもう一度話題を立ててください。</div>`;
+  if(c.diff >= 20)
+    return `<div class="quote">イベントによって発言数が増えています。
+      この期間に発言した人に対して、しっかりコメント返しやリアクションをしましょう。</div>`;
+  return `<div class="quote">前後で発言数はほとんど変わっていません。
+    イベントそのものより、<b>その前後に何を仕込んだか</b>が効きます。告知と振り返りの投稿を足して、次で比べてください。</div>`;
+}
+
+/* --- 「やること」の文言 -----------------------------------------------------
+   画面と報告書で同じものを出す。片方だけ直すと、渡した資料と画面がずれる。
+
+   note … この分析から言えること。報告書にも入れる。
+   story … 作り手自身の体験談。画面では動機づけになるが、
+           人に渡す報告書には入れない（報告書はその場の数字の説明であるべき）。 */
+const ACT = {
+  cand: () => ({
+    body: `<b>やること：</b>この方たちに、名前を呼んで話しかけてください。<br>
+     「いつも来てくれてありがとう」ではなく、<b>その人にしか言えないこと</b>を1つ。
+     前の発言を引用して返すのが一番早いです。<br>
+     そのうえで、役割を1つ渡してください。人は、任されると残ります。`,
+    story: `運営じゃないのにチャットを盛り上げてくれる方がいました。ありがたいな、で終わらせてた。
+     でもその方たちも、成長とか収益とか、何かを期待して動いてくれてた。好意に甘える設計は、いつか止まります。`
+  }),
+
+  core: r => ({
+    body: `<b>やること：</b>この方たちが、このコミュニティにいて<b>何を得られているか</b>を書き出してください。<br>
+     「ありがとう」しか出てこないなら、そこが原因です。
+     成長でも、収益でも、人脈でもいい。<b>貢献した人が報われる設計をするのは運営の責任です。</b>`,
+    note: r.coreShare >= 60
+      ? `いま上位が全発言の${r.coreShare}%を占めています。この中の1人が抜けるだけで、体感では大きく盛り上がらなくなります。`
+      : ''
+  }),
+
+  fade: r => r.fading.length
+    ? ({
+        body: `<b>やること：</b>この方たちが最後に何を発言していたかを、遡って読んでください。<br>
+         多くの場合、<b>返事がつかなかった発言</b>が最後になっています。<br>
+         いま返しても遅くありません。1件返すだけで戻ってくる人はいます。`,
+        story: `6ヶ月かけて5,000人。セール延期から1週間で500人。
+         集まるのは1日28人、離れるのは1日71人でした。人数が減る前に、まず発言が止まります。`
+      })
+    : ({
+        body: `<b>やること：</b>いまのところ予兆は出ていません。来月また同じログで測ってください。<br>
+         大事なのは1回の結果ではなく、前の月からどう動いたかです。「月ごとの内訳」で並べて見てください。`
+      }),
+
+  oneShot: () => ({
+    body: `<b>やること：</b>この方たちの最初の発言に、いま返事をしてください。<br>
+     ほとんどの場合、<b>その1件に誰も反応していません。</b>返事がつかなかった人は、二度目を書きません。<br>
+     仕組みで直すなら、初めての人が答えるだけで済む問いを1つ置いてください。
+     雑談チャンネルは「誰でも発言していい」ぶん、誰も最初の1人になれません。`,
+    story: `人が定着しないコミュニティは、だいたい「楽しくない」が理由じゃない。
+     参加しても得られるものがないから離れていきます。`
+  }),
+
+  silent: r => ({
+    body: `<b>やること：</b>この人数を、コミュニティの規模だと思わないでください。<br>
+     いまの実際の大きさは <b>${r.speakers}人</b> です。人数を追うのをやめて、
+     その ${r.speakers}人に何を返せるかを先に決めるほうが、結果的に速いです。`,
+    story: `5,000人のうち、崩れたあと残ったのは1,000人でした。
+     でも振り返ると、最初から発言してくれていたのは1,000人だった。
+     いなくなったんじゃなくて、最初から届いてなかったんです。`
+  })
+};
+
+// 画面は体験談まで出す。報告書は note までにとどめる。
+function actHtml(a, withStory){
+  const q = [a.note, withStory ? a.story : ''].filter(Boolean)
+    .map(t => `<div class="quote">${t}</div>`).join('');
+  return a.body + q;
+}
+const onScreen = a => actHtml(a, true);
+const inReport = a => actHtml(a, false);
 
 function show(){
   const r = R;
 
   document.getElementById('stats').innerHTML = [
-    ['話した人', r.speakers + '人'],
+    ['発言した人数', r.speakers + '人'],
     ['発言', r.total + '件'],
-    ['期間', r.days + '日'],
+    ['発言があった日', r.days + '日'],
     ['中核が占める割合', r.coreShare + '%']
   ].map(([l,v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 
@@ -655,24 +1217,19 @@ function show(){
 
   const ex = document.getElementById('exNote');
   const parts = [];
-  if(r.exCount) parts.push(`運営として外した発言 ${r.exCount}件`);
-  if(r.botCount) parts.push(`ボット ${r.botCount}件`);
-  ex.textContent = parts.length ? `（${parts.join('／')}を除いて計算しています）` : '';
+  if(RANGE !== 'all') parts.push(`${rangeLabel()}のみ`);
+  if(r.exCount) parts.push(`運営として外した発言 ${r.exCount}件を除外`);
+  if(r.botCount) parts.push(`ボット ${r.botCount}件を除外`);
+  ex.textContent = parts.length ? `（${parts.join('／')}）` : '';
 
   // 候補
   const cEl = document.getElementById('candidates');
   if(r.cand.length){
     cEl.innerHTML = r.cand.map((p,i) => personRow(p, i, 'var(--blue)',
       `${p.n}件 ／ ${p.days.size}日<br>やり取り ${p.out + p.inn}回`)).join('');
-    document.getElementById('candAct').innerHTML =
-      `<b>やること：</b>この方たちに、名前を呼んで話しかけてください。<br>
-       「いつも来てくれてありがとう」ではなく、<b>その人にしか言えないこと</b>を1つ。
-       前の発言を引用して返すのが一番早いです。<br>
-       そのうえで、役割を1つ渡してください。人は、任されると残ります。
-       <div class="quote">運営じゃないのにチャットを盛り上げてくれる方がいました。ありがたいな、で終わらせてた。
-       でもその方たちも、成長とか収益とか、何かを期待して動いてくれてた。好意に甘える設計は、いつか止まります。</div>`;
+    document.getElementById('candAct').innerHTML = onScreen(ACT.cand());
   }else{
-    cEl.innerHTML = `<div class="empty">候補が見つかりませんでした。発言している人が中核に偏っているか、ログの期間が短い可能性があります。もう少し長い期間で試してください。</div>`;
+    cEl.innerHTML = `<div class="empty">候補が見つかりませんでした。発言している人が中核に偏っているか、期間が短い可能性があります。${RANGE==='all'?'もう少し長い期間で試してください。':'「全期間」でも見てください。'}</div>`;
     document.getElementById('candAct').innerHTML = '';
   }
 
@@ -681,40 +1238,23 @@ function show(){
     ? r.core.map((p,i) => personRow(p, i, 'var(--purple)',
         `${p.n}件<br>全体の ${Math.round(p.n/r.total*100)}%`)).join('')
     : `<div class="empty">中核と呼べる人がまだいません。</div>`;
-  document.getElementById('coreAct').innerHTML =
-    `<b>やること：</b>この方たちが、このコミュニティにいて<b>何を得られているか</b>を書き出してください。<br>
-     「ありがとう」しか出てこないなら、そこが原因です。
-     成長でも、収益でも、人脈でもいい。<b>貢献した人が報われる設計をするのは運営の責任です。</b>
-     ${r.coreShare >= 60 ? `<div class="quote">いま上位が全発言の${r.coreShare}%を占めています。この中の1人が抜けるだけで、体感では大きく盛り上がらなくなります。</div>` : ''}`;
+  document.getElementById('coreAct').innerHTML = onScreen(ACT.core(r));
 
   // 発言が止まっている人
   document.getElementById('fading').innerHTML = r.fading.length
     ? r.fading.slice(0,5).map((p,i) => personRow(p, i, 'var(--amber)',
         `${p.n}件<br>後半は発言なし`)).join('')
     : `<div class="empty">期間の後半で発言が途切れた人はいません。</div>`;
-  document.getElementById('fadeAct').innerHTML = r.fading.length
-    ? `<b>やること：</b>この方たちが最後に何を話していたかを、遡って読んでください。<br>
-       多くの場合、<b>返事がつかなかった発言</b>が最後になっています。<br>
-       いま返しても遅くありません。1件返すだけで戻ってくる人はいます。
-       <div class="quote">6ヶ月かけて5,000人。セール延期から1週間で500人。
-       集まるのは1日28人、離れるのは1日71人でした。人数が減る前に、まず発言が止まります。</div>`
-    : `<b>やること：</b>いまのところ予兆は出ていません。来週また同じログで測ってください。<br>
-       大事なのは1回の結果ではなく、前の週からどう動いたかです。`;
+  document.getElementById('fadeAct').innerHTML = onScreen(ACT.fade(r));
 
-  // 一度だけ話して戻ってきていない人
+  // 一度だけ発言して戻ってきていない人
   const osc = document.getElementById('oneShotCard');
   if(r.oneShot.length){
     osc.style.display = '';
     document.getElementById('oneShot').innerHTML =
       r.oneShot.slice(0,5).map((p,i) => personRow(p, i, 'var(--muted)', '1件のみ')).join('')
       + (r.oneShot.length > 5 ? `<div class="empty">ほか ${r.oneShot.length - 5}人</div>` : '');
-    document.getElementById('oneShotAct').innerHTML =
-      `<b>やること：</b>この方たちの最初の発言に、いま返事をしてください。<br>
-       ほとんどの場合、<b>その1件に誰も反応していません。</b>返事がつかなかった人は、二度目を書きません。<br>
-       仕組みで直すなら、新しい人が答えるだけで済む問いを1つ置いてください。
-       雑談チャンネルは「誰でも話していい」ぶん、誰も最初の1人になれません。
-       <div class="quote">人が定着しないコミュニティは、だいたい「楽しくない」が理由じゃない。
-       参加しても得られるものがないから離れていきます。</div>`;
+    document.getElementById('oneShotAct').innerHTML = onScreen(ACT.oneShot());
   }else{
     osc.style.display = 'none';
   }
@@ -727,23 +1267,322 @@ function show(){
     sc.style.display = '';
     document.getElementById('silentNum').textContent = `${silent.toLocaleString()}人`;
     document.getElementById('silentWhy').innerHTML =
-      `メンバー ${r.members.toLocaleString()}人のうち、この期間に話したのは ${r.speakers}人（<b>${rate}%</b>）でした。`;
-    document.getElementById('silentAct').innerHTML =
-      `<b>やること：</b>この人数を、コミュニティの規模だと思わないでください。<br>
-       いまの実際の大きさは <b>${r.speakers}人</b> です。人数を追うのをやめて、
-       その ${r.speakers}人に何を返せるかを先に決めるほうが、結果的に速いです。
-       <div class="quote">5,000人のうち、崩れたあと残ったのは1,000人でした。
-       でも振り返ると、最初から話してくれていたのは1,000人だった。
-       いなくなったんじゃなくて、最初から届いてなかったんです。</div>`;
+      `メンバー ${r.members.toLocaleString()}人のうち、${rangeLabel()}に発言したのは ${r.speakers}人（<b>${rate}%</b>）でした。`;
+    document.getElementById('silentAct').innerHTML = onScreen(ACT.silent(r));
   }else{
     sc.style.display = 'none';
   }
+
+  // 報告書は「画面で選んでいる月」ではなく全部入る。渡す前に名前の扱いだけは意識してもらう
+  document.getElementById('reportNote').innerHTML = isAnon()
+    ? `名前は<b>伏せ字</b>（Aさん・Bさん…）で書き出します。伏せ字は人ごとに固定なので、表とリストを突き合わせて読めます。<br>
+       報告書には、選んでいる期間に関わらず<b>全期間・月ごと・イベントの前後がすべて入ります。</b>`
+    : `<b style="color:var(--amber)">名前をそのまま書き出します。</b>
+       社外に渡す場合は「名前を伏せて表示する」にチェックを入れてから、もう一度ダウンロードしてください。<br>
+       報告書には、選んでいる期間に関わらず<b>全期間・月ごと・イベントの前後がすべて入ります。</b>`;
 
   draw();
 }
 
 /* ==========================================================================
-   5. シェア画像（名前は入れない）
+   6. 報告書  — そのまま渡せる形で書き出す
+   画面で選んでいる期間に関係なく、全期間・月ごと・イベントを全部入れる。
+   一部だけの資料を渡すと、受け取った側が前提を確かめられない。
+   ========================================================================== */
+const RSKIN = {fg:'#1b2733', muted:'#5b6672', line:'#dfe4ea', bar:'#9aa7b4', mark:'#a8760a'};
+
+function today(){ const d = new Date(); return keyOf(d); }
+function logRange(){
+  if(!IDX || !IDX.dated) return '日付なし';
+  return `${IDX.days[0]} 〜 ${IDX.days[IDX.days.length-1]}（${IDX.days.length}日間）`;
+}
+function nameMode(){ return isAnon() ? '伏せ字' : '実名'; }
+
+// 人のリストを表にする。画面のカードと同じ並びだが、報告書では一覧性を優先する
+function rTable(list, headExtra, rowExtra){
+  if(!list.length) return `<p class="none">該当する人はいませんでした。</p>`;
+  return `<table><thead><tr><th>#</th><th>名前</th><th>推定される役割</th>${headExtra}</tr></thead><tbody>` +
+    list.map((p, i) => `<tr><td>${i+1}</td><td class="nm">${escapeHtml(label(p))}</td>
+      <td>${p.role ? escapeHtml(p.role.name) : '—'}</td>${rowExtra(p)}</tr>`).join('') +
+    `</tbody></table>`;
+}
+
+function buildReport(){
+  const all = analyze(MSGS);
+  all.members = Number(document.getElementById('members').value) || null;
+
+  const cover = `
+    <h1>コミュニティ分析レポート</h1>
+    <p class="sub">次に声をかける3人 — 発言ログから、伸びしろのある人と離れかけている人を抽出しています</p>
+    <table class="meta"><tbody>
+      <tr><th>作成日</th><td>${today()}</td></tr>
+      <tr><th>対象期間</th><td>${logRange()}</td></tr>
+      <tr><th>発言</th><td>${all.total}件 ／ 発言した人数 ${all.speakers}人</td></tr>
+      <tr><th>名前の扱い</th><td>${nameMode()}</td></tr>
+    </tbody></table>`;
+
+  const pre = `
+    <div class="pre">
+      <b>この数字の前提</b>
+      <ul>
+        <li>ボットの発言 ${all.botCount}件、運営として外した発言 ${all.exCount}件を、すべての集計から除いています。</li>
+        <li>日付は、タイムゾーン付きの日時をこの端末のタイムゾーンに直してから数えています。</li>
+        <li>役割の推定は、日本語の言い回しと会話の並びによるものです。<b>あくまで傾向で、外れることがあります。</b></li>
+        <li>ログの期間外は考慮されていません。</li>
+      </ul>
+    </div>`;
+
+  const summary = `
+    <h2>1. 全体の数字</h2>
+    <div class="cards">
+      ${[['発言した人数', all.speakers + '人'], ['発言', all.total + '件'],
+         ['発言があった日', all.days + '日'], ['中核が占める割合', all.coreShare + '%']]
+        .map(([l, v]) => `<div class="c"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('')}
+    </div>
+    ${all.coreShare >= 60 ? `<p class="warn">上位が全発言の ${all.coreShare}% を占めています。この中の1人が抜けるだけで、体感では大きく盛り上がらなくなります。</p>` : ''}`;
+
+  const tl = IDX && IDX.dated ? `
+    <h2>2. 日ごとの動き</h2>
+    <div class="fig">${timeline(IDX, EVENTS, RSKIN)}</div>
+    ${EVENTS.length ? `<p class="cap">縦の線がイベントの日です。${
+      EVENTS.map((e, i) => `<b>${i+1}</b> ${e.key} ${escapeHtml(e.name)}`).join('　／　')}</p>` : ''}` : '';
+
+  const months = MONTHS.length ? `
+    <h2>3. 月ごとの内訳</h2>
+    <table><thead><tr><th>月</th><th>発言</th><th>前月比</th><th>発言した人数</th><th>発言があった日</th>
+      <th>新規発言者</th><th>この月で発言が止まった人</th><th>中核が占める割合</th></tr></thead><tbody>` +
+    MONTHS.map((m, i) => {
+      const p = MONTHS[i-1];
+      const d = p && p.total ? Math.round((m.total - p.total) / p.total * 100) : null;
+      return `<tr><td class="nm">${m.label}</td><td>${m.total}</td>
+        <td class="${d === null ? '' : d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d === null ? '—' : (d > 0 ? '▲' : d < 0 ? '▼' : '±') + Math.abs(d) + '%'}</td>
+        <td>${m.speakers}</td><td>${m.days}</td><td>${m.fresh}</td><td>${m.ended || '—'}</td>
+        <td>${m.coreShare}%</td></tr>`;
+    }).join('') + `</tbody></table>
+    <p class="cap">「この月で発言が止まった人」は、最終月では出していません（まだ終わっていないため）。</p>` : '';
+
+  const evs = CMP.length ? `
+    <h2>4. イベントの前後</h2>
+    <p class="cap">前${WIN}日と後${WIN}日の<b>平均発言数</b>で比較しています。</p>` +
+    CMP.map((c, i) => {
+      const dTxt = c.diff === null ? '—' : `${c.diff > 0 ? '+' : ''}${Math.round(c.diff)}%`;
+      const cls = c.diff === null ? '' : c.diff > 0 ? 'up' : c.diff < 0 ? 'down' : '';
+      const warn = [];
+      if(!c.inLog) warn.push('この日はログの期間の外です。');
+      if(c.short) warn.push(`前後の窓のうち ${c.short}日分がログの期間の外のため、数えていません。`);
+      return `<h3>${i+1}. ${escapeHtml(c.ev.name)}<span class="d">${c.ev.key}</span></h3>
+        <table><thead><tr><th></th><th>発言</th><th>平均発言数</th><th>発言した人数</th><th>数えた日数</th></tr></thead><tbody>
+          <tr><td class="nm">前${WIN}日</td><td>${c.before.n}</td><td>${c.before.perDay.toFixed(1)}</td><td>${c.before.speakers}</td><td>${c.before.inRange}</td></tr>
+          <tr><td class="nm">当日</td><td>${c.onDay.n}</td><td>—</td><td>${c.onDay.speakers}</td><td>1</td></tr>
+          <tr><td class="nm">後${WIN}日</td><td>${c.after.n}</td><td class="${cls}">${c.after.perDay.toFixed(1)}</td><td>${c.after.speakers}</td><td>${c.after.inRange}</td></tr>
+        </tbody></table>
+        <p class="kpi">平均発言数：<b class="${cls}">${dTxt}</b>　／　イベント後の新規発言者：<b>${c.newcomers}人</b></p>
+        ${warn.length ? `<p class="warn">${warn.join('<br>')}</p>` : ''}
+        <div class="act">${eventNote(c, WIN)}</div>`;
+    }).join('') : '';
+
+  const sig = p => `<td>${p.n}</td><td>${p.days.size}</td><td>${p.out + p.inn}</td>`;
+  const cols = `<th>発言</th><th>発言があった日</th><th>やり取り</th>`;
+
+  const people = `
+    <h2>5. 次に声をかける3人<span class="d">全期間</span></h2>
+    <p class="cap">発言はしているが、まだ中心にはいない。他の人とやり取りしていて、複数の日に顔を出している人です。</p>
+    ${rTable(all.cand, cols, sig)}
+    <div class="act">${inReport(ACT.cand())}</div>
+
+    <h2>6. 中核メンバー</h2>
+    <p class="cap">この人たちが抜けると、コミュニティは目に見えて盛り上がらなくなります。</p>
+    ${rTable(all.core, `<th>発言</th><th>全体に占める割合</th>`,
+      p => `<td>${p.n}</td><td>${Math.round(p.n / all.total * 100)}%</td>`)}
+    <div class="act">${inReport(ACT.core(all))}</div>
+
+    <h2>7. 発言が止まっている人</h2>
+    <p class="cap">期間の前半には発言していたのに、後半で発言が途切れた人です。人数が減る前に、まずここに出ます。</p>
+    ${rTable(all.fading.slice(0, 10), `<th>発言</th><th>発言があった日</th>`, p => `<td>${p.n}</td><td>${p.days.size}</td>`)}
+    <div class="act">${inReport(ACT.fade(all))}</div>
+
+    <h2>8. 一度だけ発言して、戻ってきていない人</h2>
+    <p class="cap">1回発言したきり、その後は出てきていない人です。最初の1回に返事がつかなかったケースがほとんどです。</p>
+    ${all.oneShot.length
+      ? rTable(all.oneShot.slice(0, 15), `<th>発言</th><th>発言があった日</th>`, p => `<td>${p.n}</td><td>${p.days.size}</td>`)
+        + (all.oneShot.length > 15 ? `<p class="cap">ほか ${all.oneShot.length - 15}人。</p>` : '')
+        + `<div class="act">${inReport(ACT.oneShot())}</div>`
+      : `<p class="none">該当する人はいませんでした。</p>`}
+
+    ${all.members && all.members > all.speakers ? `
+      <h2>9. まだ一度も発言していない人</h2>
+      <p class="cap">メンバー ${all.members.toLocaleString()}人のうち、この期間に発言したのは ${all.speakers}人
+        （<b>${Math.round(all.speakers / all.members * 100)}%</b>）でした。
+        発言していない人は <b>${(all.members - all.speakers).toLocaleString()}人</b>です。</p>
+      <div class="act">${inReport(ACT.silent(all))}</div>` : ''}`;
+
+  const appendix = MONTHS.length > 1 ? `
+    <h2>付録A　月ごとの「次に声をかける3人」</h2>
+    <p class="cap">同じ人が翌月に中核へ上がっていれば、声かけが効いています。
+      候補に居続けているなら、まだ届いていません。</p>
+    <table><thead><tr><th>月</th><th>次に声をかける3人</th><th>中核メンバー</th></tr></thead><tbody>` +
+    MONTHS.map(m => `<tr>
+      <td class="nm">${m.label}</td>
+      <td>${m.cand.length ? m.cand.map(p => escapeHtml(label(p))).join('、') : '—'}</td>
+      <td>${m.core.length ? m.core.map(p => escapeHtml(label(p))).join('、') : '—'}</td>
+    </tr>`).join('') + `</tbody></table>` : '';
+
+  const dist = `
+    <h2>付録B　発言の分布<span class="d">全期間・上位15人</span></h2>
+    <div class="fig">${chart(all, RSKIN)}</div>
+    <p class="cap">
+      <span class="lg" style="background:#bc8cff"></span>中核
+      <span class="lg" style="background:#58a6ff"></span>声をかける候補
+      <span class="lg" style="background:#e3b341"></span>発言が止まった
+      <span class="lg" style="background:#9aa7b4"></span>その他
+    </p>`;
+
+  const tail = `
+    <div class="pre">
+      <b>この報告書の限界</b>
+      <ul>
+        <li>役割の推定と「発言が止まった」の判定は、しきい値を実運用で詰めている途中のものです。名指しの根拠としてではなく、<b>見に行く先の候補</b>として使ってください。</li>
+        <li>メンションの検出は名前の文字列一致です。同じ語が本文に含まれると、やり取りとして数えられることがあります。</li>
+        <li>この集計はすべてブラウザの中で行っており、ログはどこにも送信していません。</li>
+      </ul>
+    </div>
+    <p class="foot">次に声をかける3人 — https://shinya-holdings.github.io/community-checkup/</p>`;
+
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コミュニティ分析レポート ${today()}</title>
+<style>
+  @page{size:A4;margin:16mm}
+  *{box-sizing:border-box}
+  body{margin:0;padding:44px 30px 70px;background:#fff;color:#1b2733;line-height:1.8;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    font-size:14px;max-width:860px;margin:0 auto}
+  h1{font-size:27px;margin:0 0 6px}
+  .sub{color:#5b6672;font-size:13.5px;margin:0 0 26px}
+  h2{font-size:18px;margin:38px 0 10px;padding-bottom:8px;border-bottom:2px solid #1b2733}
+  h3{font-size:15px;margin:26px 0 8px}
+  h2 .d,h3 .d{font-size:12px;color:#5b6672;font-weight:400;margin-left:10px}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0}
+  th,td{border:1px solid #dfe4ea;padding:8px 11px;text-align:right}
+  th{background:#f4f6f8;color:#5b6672;font-weight:400;font-size:12.5px}
+  td.nm,th:first-child{text-align:left}
+  table.meta{width:auto;min-width:60%}
+  table.meta th{text-align:left;width:110px}
+  table.meta td{text-align:left}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+  .c{border:1px solid #dfe4ea;border-radius:8px;padding:12px 14px}
+  .c .l{font-size:11.5px;color:#5b6672}
+  .c .v{font-size:24px;font-weight:800}
+  .cap{color:#5b6672;font-size:12.5px;margin:6px 0 0}
+  .kpi{font-size:14px;margin:10px 0 0}
+  .none{color:#5b6672;font-size:13px}
+  .up{color:#1a7f37} .down{color:#b3261e}
+  .warn{background:#fdf6e3;border-left:3px solid #a8760a;padding:9px 13px;font-size:13px;margin:12px 0}
+  .pre{background:#f4f6f8;border-radius:8px;padding:14px 20px;font-size:13px;margin:18px 0}
+  .pre ul{margin:8px 0 0;padding-left:20px}
+  .pre li{margin-bottom:4px}
+  .act{border-left:3px solid #1b2733;padding:2px 0 2px 15px;margin:14px 0;font-size:13.5px}
+  .act .quote{border-left:3px solid #dfe4ea;padding-left:13px;color:#5b6672;font-size:12.5px;margin-top:10px}
+  .fig{border:1px solid #dfe4ea;border-radius:8px;padding:14px;margin-top:10px}
+  .lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 5px 0 14px}
+  .lg:first-of-type{margin-left:0}
+  .foot{color:#5b6672;font-size:11.5px;margin-top:34px;padding-top:14px;border-top:1px solid #dfe4ea}
+  @media print{ body{padding:0} h2{page-break-after:avoid} table,.fig,.act{page-break-inside:avoid} }
+</style></head><body>
+${cover}${pre}${summary}${tl}${months}${evs}${people}${appendix}${dist}${tail}
+</body></html>`;
+}
+
+/* Markdown 版。Notion や議事録に貼るとき用 */
+function buildMarkdown(){
+  const all = analyze(MSGS);
+  all.members = Number(document.getElementById('members').value) || null;
+  const L = [];
+  const row = a => `| ${a.join(' | ')} |`;
+  const sep = n => `|${' --- |'.repeat(n)}`;
+
+  L.push(`# コミュニティ分析レポート`, '');
+  L.push(`- 作成日: ${today()}`, `- 対象期間: ${logRange()}`,
+         `- 発言: ${all.total}件 ／ 発言した人数: ${all.speakers}人`, `- 名前の扱い: ${nameMode()}`, '');
+  L.push(`> ボットの発言 ${all.botCount}件、運営として外した発言 ${all.exCount}件を除いています。`,
+         `> 役割の推定はあくまで傾向で、外れることがあります。`, '');
+
+  L.push(`## 1. 全体の数字`, '');
+  L.push(row(['発言した人数', '発言', '発言があった日', '中核が占める割合']), sep(4),
+         row([all.speakers + '人', all.total + '件', all.days + '日', all.coreShare + '%']), '');
+
+  if(MONTHS.length){
+    L.push(`## 2. 月ごとの内訳`, '');
+    L.push(row(['月','発言','前月比','発言した人数','発言があった日','新規発言者','この月で発言が止まった人','中核が占める割合']), sep(8));
+    MONTHS.forEach((m, i) => {
+      const p = MONTHS[i-1];
+      const d = p && p.total ? Math.round((m.total - p.total) / p.total * 100) : null;
+      L.push(row([m.label, m.total, d === null ? '—' : (d > 0 ? '+' : '') + d + '%',
+                  m.speakers, m.days, m.fresh, m.ended || '—', m.coreShare + '%']));
+    });
+    L.push('');
+  }
+
+  if(CMP.length){
+    L.push(`## 3. イベントの前後（前後${WIN}日）`, '');
+    L.push(row(['イベント','日付','前の平均発言数','当日','後の平均発言数','変化','イベント後の新規発言者']), sep(7));
+    CMP.forEach(c => L.push(row([c.ev.name, c.ev.key, c.before.perDay.toFixed(1), c.onDay.n + '件',
+      c.after.perDay.toFixed(1),
+      c.diff === null ? '—' : (c.diff > 0 ? '+' : '') + Math.round(c.diff) + '%', c.newcomers + '人'])));
+    L.push('');
+    CMP.forEach((c, i) => {
+      if(c.short || !c.inLog)
+        L.push(`> ${i+1}. ${c.ev.name}: ${!c.inLog ? 'この日はログの期間の外です。' : ''}${c.short ? `前後の窓のうち ${c.short}日分がログの期間の外のため、数えていません。` : ''}`);
+    });
+    L.push('');
+  }
+
+  const list = (title, why, arr, fmt) => {
+    L.push(`## ${title}`, '', why, '');
+    if(!arr.length){ L.push('該当する人はいませんでした。', ''); return; }
+    L.push(row(['#','名前','推定される役割','詳細']), sep(4));
+    arr.forEach((p, i) => L.push(row([i+1, label(p), p.role ? p.role.name : '—', fmt(p)])));
+    L.push('');
+  };
+  list('4. 次に声をかける3人', '発言はしているが、まだ中心にはいない。他の人とやり取りしていて、複数の日に顔を出している人です。',
+    all.cand, p => `${p.n}件 ／ ${p.days.size}日 ／ やり取り${p.out + p.inn}回`);
+  list('5. 中核メンバー', 'この人たちが抜けると、コミュニティは目に見えて盛り上がらなくなります。',
+    all.core, p => `${p.n}件（全体の${Math.round(p.n / all.total * 100)}%）`);
+  list('6. 発言が止まっている人', '期間の前半には発言していたのに、後半で発言が途切れた人です。',
+    all.fading.slice(0, 10), p => `${p.n}件 ／ ${p.days.size}日`);
+  list('7. 一度だけ発言して、戻ってきていない人', '1回発言したきり、その後は出てきていない人です。',
+    all.oneShot.slice(0, 15), p => `${p.n}件`);
+
+  if(MONTHS.length > 1){
+    L.push(`## 付録　月ごとの「次に声をかける3人」`, '');
+    L.push(row(['月','次に声をかける3人','中核メンバー']), sep(3));
+    MONTHS.forEach(m => L.push(row([m.label,
+      m.cand.map(p => label(p)).join('、') || '—',
+      m.core.map(p => label(p)).join('、') || '—'])));
+    L.push('');
+  }
+  L.push('---', '', '次に声をかける3人 — https://shinya-holdings.github.io/community-checkup/');
+  return L.join('\n');
+}
+
+function save(name, text, mime){
+  const url = URL.createObjectURL(new Blob([text], {type: mime + ';charset=utf-8'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 8000);
+}
+
+document.getElementById('dlHtml').onclick = () => { if(R) save(`community-report-${today()}.html`, buildReport(), 'text/html'); };
+document.getElementById('dlMd').onclick   = () => { if(R) save(`community-report-${today()}.md`, buildMarkdown(), 'text/markdown'); };
+document.getElementById('openHtml').onclick = () => {
+  if(!R) return;
+  const url = URL.createObjectURL(new Blob([buildReport()], {type:'text/html;charset=utf-8'}));
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+};
+
+/* ==========================================================================
+   7. シェア画像（名前は入れない）
    ========================================================================== */
 function draw(){
   const r = R, c = document.getElementById('cv'), x = c.getContext('2d');
@@ -752,10 +1591,10 @@ function draw(){
   x.fillStyle='#58a6ff'; x.fillRect(0,0,10,900);
 
   x.fillStyle='#7d8a99'; x.font=F(32);
-  x.fillText('コミュニティ分析｜次に声をかける人', 100, 96);
+  x.fillText(`コミュニティ分析｜次に声をかける人　—　${rangeLabel()}`, 100, 96);
 
   const cells = [
-    ['話した人', r.speakers + '人', '#e6edf3'],
+    ['発言した人数', r.speakers + '人', '#e6edf3'],
     ['中核が占める割合', r.coreShare + '%', r.coreShare >= 60 ? '#ff6b6b' : '#56d364'],
     ['声をかける候補', r.cand.length + '人', '#58a6ff'],
     ['発言が止まった人', r.fading.length + '人', r.fading.length ? '#e3b341' : '#56d364']
@@ -771,7 +1610,7 @@ function draw(){
 
   x.fillStyle='#e6edf3'; x.font=F(40,700);
   const msg = r.members && r.members > r.speakers
-    ? `${r.members.toLocaleString()}人のうち、話しているのは ${r.speakers}人`
+    ? `${r.members.toLocaleString()}人のうち、発言しているのは ${r.speakers}人`
     : (r.coreShare >= 60 ? '上位数人に、支えられすぎています' : '次に声をかける人が、見つかりました');
   x.fillText(msg, 100, 800);
   x.fillStyle='#7d8a99'; x.font=F(28);
@@ -780,7 +1619,7 @@ function draw(){
 
 document.getElementById('dl').onclick = () => {
   const a = document.createElement('a');
-  a.download = 'community-next3.png';
+  a.download = `community-next3-${RANGE}.png`;
   a.href = document.getElementById('cv').toDataURL('image/png');
   a.click();
 };
