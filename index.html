@@ -96,6 +96,13 @@
   /* イベント入力行 */
   .evRow{display:grid;grid-template-columns:172px 1fr auto;gap:10px;align-items:center;margin-bottom:10px}
   @media(max-width:640px){.evRow{grid-template-columns:1fr;gap:8px}}
+
+  /* 読み込んだファイルの一覧 */
+  .srcRow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);
+    font-size:13.5px;flex-wrap:wrap}
+  .srcRow .fn{font-weight:700;word-break:break-all;flex:1;min-width:180px}
+  .srcRow .meta{color:var(--muted);font-size:12.5px;white-space:nowrap}
+  .srcRow button{padding:6px 12px;font-size:12px}
 </style>
 </head>
 <body>
@@ -118,10 +125,12 @@
     <div class="big">ファイルをドラッグ＆ドロップ</div>
     <div class="sm">
       .txt ／ .csv ／ .json ／ .docx に対応（クリックして選ぶこともできます）<br>
-      DiscordChatExporter の書き出し、Discordからのコピー、Wordに貼ったもの、どれでも読めます
+      DiscordChatExporter の書き出し、Discordからのコピー、Wordに貼ったもの、どれでも読めます<br>
+      <b>複数のファイルをまとめて読み込めます。</b>チャンネルごと・期間ごとの書き出しを1つの結果にまとめます
     </div>
-    <input type="file" id="file" accept=".txt,.csv,.json,.docx,.html" style="display:none">
+    <input type="file" id="file" accept=".txt,.csv,.json,.docx,.html" multiple style="display:none">
   </div>
+  <div id="srcList"></div>
   <div class="row" style="margin-top:14px">
     <span class="err" id="fileMsg"></span>
   </div>
@@ -136,7 +145,9 @@
 <p class="hint">
   運営やコミュニティマネージャーは、投稿するのが仕事です。<br>
   外さないまま数えると、必ず中核に入って「一部に偏っている」という結果になります。<br>
-  <strong>外したい人にチェックを入れてください。</strong>ボットは自動で外れます。
+  <strong>外したい人にチェックを入れてください。</strong>ボットは自動で外れます。<br>
+  複数のファイルを読み込んだときは、<strong>ここに似た名前が2つ並んでいないか</strong>見てください。
+  書き出しの形式によって表示名とユーザー名が入れ替わることがあり、同じ人が別人として数えられます。
 </p>
 <div class="panel">
   <div id="nameBox"><div class="empty" style="color:var(--muted);font-size:14px">
@@ -485,6 +496,8 @@ function parseDateInput(v){
    3. UI（ファイル受け取り）
    ========================================================================== */
 let loaded = null;
+let SOURCES = [];   // 読み込んだファイル。1件でも複数でも同じ道を通す
+let MERGE = null;   // まとめた結果の内訳（重複・並び・期間）
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
 const fileMsg = document.getElementById('fileMsg');
@@ -492,25 +505,112 @@ const fileMsg = document.getElementById('fileMsg');
 drop.onclick = () => fileInput.click();
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
 drop.ondragleave = () => drop.classList.remove('over');
-drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over');
-  if(e.dataTransfer.files[0]) take(e.dataTransfer.files[0]); };
-fileInput.onchange = e => { if(e.target.files[0]) take(e.target.files[0]); };
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); take(e.dataTransfer.files); };
+fileInput.onchange = e => { take(e.target.files); if(e.target) e.target.value = ''; };
 
-async function take(f){
+async function take(files){
+  const list = [...(files || [])];
+  if(!list.length) return;
   fileMsg.className = 'err'; fileMsg.textContent = '読み込み中…';
-  try{
-    const msgs = await readFile(f);
-    if(!msgs.length) throw new Error('メッセージを読み取れませんでした');
-    loaded = msgs;
-    fileMsg.className = 'ok';
-    fileMsg.textContent = `${f.name} を読み込みました（${msgs.length}件）`;
-    refreshNames(msgs);
-    suggestEventDates(msgs);
-  }catch(err){
-    loaded = null;
-    fileMsg.className = 'err';
-    fileMsg.textContent = 'この形式は読み取れませんでした。テキストとして貼り付けてみてください。';
+  const failed = [];
+  for(const f of list){
+    try{
+      const msgs = await readFile(f);
+      if(!msgs.length) throw new Error('empty');
+      // 取り込み元を各発言に付ける。会話の隣接をチャンネル内に閉じるために要る
+      for(const m of msgs) m.src = f.name;
+      const dates = msgs.map(m => dateOf(m.ts)).filter(Boolean).sort((a,b) => a-b);
+      const src = {name:f.name, msgs, n:msgs.length,
+                   from: dates[0] || null, to: dates[dates.length-1] || null,
+                   dated: dates.length === msgs.length};
+      // 同じ名前で読み直したら差し替える。押し間違いで二重に積まないため
+      const at = SOURCES.findIndex(s => s.name === f.name);
+      if(at >= 0) SOURCES[at] = src; else SOURCES.push(src);
+    }catch(err){ failed.push(f.name); }
   }
+  rebuild(failed);
+}
+
+/* 読み込んだファイルを1つの発言列にまとめる。
+   ここでの判断は3つ：重複を落とすか、時刻順に並べ替えるか、期間の食い違いを知らせるか。 */
+function mergeSources(){
+  const all = SOURCES.flatMap(s => s.msgs);
+  const seen = new Set(), msgs = [];
+  for(const m of all){
+    // 期間の重なった書き出しを2つ読むと、同じ発言が二重に数えられる。
+    // このCSVには発言のIDが無いので、投稿者・日時・本文の組で同一とみなす
+    const key = `${m.author} ${m.ts} ${m.body || ''}`;
+    if(seen.has(key)) continue;
+    seen.add(key); msgs.push(m);
+  }
+  const dupes = all.length - msgs.length;
+
+  // 日付が全件そろっているときだけ並べ替える。
+  // 「今日」「昨日」しか無い貼り付けログを混ぜると、順番を保証できない
+  const dated = msgs.every(m => dateOf(m.ts));
+  if(dated) msgs.sort((a, b) => dateOf(a.ts) - dateOf(b.ts));
+
+  // 期間の食い違い：片方だけが覆っている月があると、増減が実態とずれる
+  const spans = SOURCES.filter(s => s.from && s.to);
+  let gap = 0;
+  if(spans.length > 1){
+    const lo = Math.min(...spans.map(s => +s.from)), hi = Math.max(...spans.map(s => +s.to));
+    const inner = Math.max(...spans.map(s => +s.from)), outer = Math.min(...spans.map(s => +s.to));
+    gap = Math.round(((inner - lo) + (hi - outer)) / 86400000);
+  }
+  return {msgs, dupes, dated, gap};
+}
+
+function rebuild(failed){
+  MERGE = SOURCES.length ? mergeSources() : null;
+  loaded = MERGE && MERGE.msgs.length ? MERGE.msgs : null;
+  renderSources(failed || []);
+
+  if(loaded){
+    refreshNames(loaded);
+    suggestEventDates(loaded);
+    // 分析済みなら、ファイルを足した／外した結果をそのまま反映する
+    if(R){ MSGS = loaded; rerun(); }
+  }else{
+    document.getElementById('nameBox').innerHTML =
+      `<div class="empty">ログを読み込むと、ここに名前が並びます。</div>`;
+    updateExMsg();
+    R = null; MSGS = null;
+    document.getElementById('result').style.display = 'none';
+  }
+}
+
+function fmtSpan(s){
+  if(!s.from) return '日付なし';
+  const a = keyOf(s.from), b = keyOf(s.to);
+  return a === b ? a : `${a} 〜 ${b}`;
+}
+
+function renderSources(failed){
+  const box = document.getElementById('srcList');
+  if(!SOURCES.length){ box.innerHTML = ''; }
+  else{
+    box.innerHTML = `<div style="margin-top:16px">` + SOURCES.map((s, i) =>
+      `<div class="srcRow">
+         <span class="fn">${escapeHtml(s.name)}</span>
+         <span class="meta">${s.n}件 ／ ${fmtSpan(s)}</span>
+         <button class="x" type="button" data-i="${i}">外す</button>
+       </div>`).join('') + `</div>`;
+    box.querySelectorAll('button').forEach(b => {
+      b.onclick = () => { SOURCES.splice(Number(b.dataset.i), 1); rebuild([]); };
+    });
+  }
+
+  const notes = [];
+  if(failed.length) notes.push(`<span style="color:var(--red)">${escapeHtml(failed.join('、'))} は読み取れませんでした。</span>`);
+  if(MERGE){
+    notes.push(`${SOURCES.length}ファイル・${MERGE.msgs.length}件を1つにまとめました。`);
+    if(MERGE.dupes) notes.push(`同じ発言 ${MERGE.dupes}件を重複として除きました。`);
+    if(!MERGE.dated) notes.push(`<span style="color:var(--amber)">日付が読み取れない発言があるため、ファイルをまたぐ並び順は読み込んだ順のままです。</span>`);
+    if(MERGE.gap > 0) notes.push(`<span style="color:var(--amber)">ファイルごとに期間が違います（ずれ 約${MERGE.gap}日）。重なっていない期間では、月ごとの増減とイベント前後の比較が実態とずれます。</span>`);
+  }
+  fileMsg.className = failed.length ? 'err' : 'ok';
+  fileMsg.innerHTML = notes.join('<br>');
 }
 
 /* --- 除外リスト ---------------------------------------------------------- */
@@ -656,14 +756,31 @@ function analyze(msgs){
     p.last = i;
   });
 
+  /* 同じ取り込み元の中でだけ「直前」を見るための下ごしらえ。
+     複数のチャンネルを読み込むと、時刻順に並べた結果として
+     別チャンネルの発言が隣り合う。それを会話の続きと数えると、
+     質問と無関係な発言が「答える人」に化ける。 */
+  const srcOf = m => m.src || '';
+  const prevSame = new Array(real.length);   // 同じ取り込み元での直前の位置
+  const rankInSrc = new Array(real.length);  // 同じ取り込み元での何件目か
+  {
+    const last = new Map(), cnt = new Map();
+    real.forEach((m, i) => {
+      const s = srcOf(m);
+      prevSame[i] = last.has(s) ? last.get(s) : -1;
+      rankInSrc[i] = cnt.get(s) || 0;
+      last.set(s, i); cnt.set(s, rankInSrc[i] + 1);
+    });
+  }
+
   // メンションの往来＝関係を作ろうとしている signal
+  // 元は名前ごとに正規表現を組んでいたが `@?<名前>` は名前の部分一致と同じ意味で、
+  // 発言数×人数ぶんの正規表現生成が丸ごと無駄だった（2万件で1.3秒かかっていた）
   const names = [...people.keys()];
   const mentionsIn = real.map(m => {
     const b = m.body || '', hit = [];
-    for(const nm of names){
-      if(nm === m.author) continue;
-      const key = nm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      if(new RegExp('@?' + key).test(b)) hit.push(nm);
+    if(b) for(const nm of names){
+      if(nm !== m.author && b.includes(nm)) hit.push(nm);
     }
     return hit;
   });
@@ -684,24 +801,27 @@ function analyze(msgs){
     if(PAT.question.test(b)) p.asks++;
     if(PAT.praise.test(b))  p.praises++;
 
-    // 話題を出す人：日が変わって最初の発言、または前が自分以外で十分に長い発言
-    const prev = real[i-1];
+    // 話題を出す人：そのチャンネルで日が変わって最初の発言
+    const prev = prevSame[i] >= 0 ? real[prevSame[i]] : null;
     if(!prev || dayKey(prev.ts) !== dayKey(m.ts)){
       if(!PAT.question.test(b) && b.length >= 20) p.starter++;
     }
 
-    // 答える人：直前3件以内に他人の質問があり、それに続けて反応している
-    for(let k = Math.max(0, i-3); k < i; k++){
+    // 答える人：同じチャンネルの直前3件以内に他人の質問があり、それに続けて反応している
+    for(let k = prevSame[i], back = 0; k >= 0 && back < 3; k = prevSame[k], back++){
       const q = real[k];
       if(q.author === m.author) continue;
       if(!PAT.question.test(q.body || '')) continue;
-      if(mentionsIn[i].includes(q.author) || (i - k) === 1){ p.answers++; break; }
+      if(mentionsIn[i].includes(q.author) || back === 0){ p.answers++; break; }
     }
 
     // 迎える人：歓迎の言葉を使うか、その回に初めて現れた人へ反応している
     if(PAT.welcome.test(b)) p.welcomes++;
     for(const nm of mentionsIn[i]){
-      if(firstSeen.get(nm) !== undefined && i - firstSeen.get(nm) <= 2) p.welcomes++;
+      const f = firstSeen.get(nm);
+      if(f === undefined) continue;
+      // 「初めて現れた直後」も、同じチャンネルの中で数える
+      if(srcOf(real[f]) === srcOf(m) && rankInSrc[i] - rankInSrc[f] <= 2) p.welcomes++;
     }
 
     // 頼られている人：感謝の言葉つきで名前を呼ばれた回数
@@ -1321,6 +1441,18 @@ function buildReport(){
       <tr><th>名前の扱い</th><td>${nameMode()}</td></tr>
     </tbody></table>`;
 
+  // 何を読み込んだ結果なのかは、報告書に無いと受け取った側が前提を確かめられない。
+  // ただしファイル名にはコミュニティ名やクライアント名が入りうるので、伏せ字に従わせる
+  const srcTable = SOURCES.length ? `
+    <h2>読み込んだログ</h2>
+    <table><thead><tr><th>ファイル</th><th>発言</th><th>期間</th></tr></thead><tbody>` +
+    SOURCES.map((s, i) => `<tr>
+      <td class="nm">${isAnon() ? `ログ${i+1}` : escapeHtml(s.name)}</td>
+      <td>${s.n}</td><td>${fmtSpan(s)}</td></tr>`).join('') + `</tbody></table>
+    ${MERGE && MERGE.dupes ? `<p class="cap">同じ発言 ${MERGE.dupes}件を重複として除いています。</p>` : ''}
+    ${MERGE && MERGE.gap > 0 ? `<p class="warn">ファイルごとに期間が違います（ずれ 約${MERGE.gap}日）。
+      重なっていない期間では、月ごとの増減とイベント前後の比較が実態とずれます。</p>` : ''}` : '';
+
   const pre = `
     <div class="pre">
       <b>この数字の前提</b>
@@ -1329,6 +1461,7 @@ function buildReport(){
         <li>日付は、タイムゾーン付きの日時をこの端末のタイムゾーンに直してから数えています。</li>
         <li>役割の推定は、日本語の言い回しと会話の並びによるものです。<b>あくまで傾向で、外れることがあります。</b></li>
         <li>ログの期間外は考慮されていません。</li>
+        ${SOURCES.length > 1 ? `<li>会話の続きとみなす判定は、<b>同じログの中だけ</b>で行っています。ファイルをまたいで隣り合った発言は、会話として数えていません。</li>` : ''}
       </ul>
     </div>`;
 
@@ -1489,7 +1622,7 @@ function buildReport(){
   .foot{color:#5b6672;font-size:11.5px;margin-top:34px;padding-top:14px;border-top:1px solid #dfe4ea}
   @media print{ body{padding:0} h2{page-break-after:avoid} table,.fig,.act{page-break-inside:avoid} }
 </style></head><body>
-${cover}${pre}${summary}${tl}${months}${evs}${people}${appendix}${dist}${tail}
+${cover}${srcTable}${pre}${summary}${tl}${months}${evs}${people}${appendix}${dist}${tail}
 </body></html>`;
 }
 
@@ -1506,6 +1639,17 @@ function buildMarkdown(){
          `- 発言: ${all.total}件 ／ 発言した人数: ${all.speakers}人`, `- 名前の扱い: ${nameMode()}`, '');
   L.push(`> ボットの発言 ${all.botCount}件、運営として外した発言 ${all.exCount}件を除いています。`,
          `> 役割の推定はあくまで傾向で、外れることがあります。`, '');
+
+  if(SOURCES.length){
+    L.push(`## 読み込んだログ`, '');
+    L.push(row(['ファイル','発言','期間']), sep(3));
+    SOURCES.forEach((s, i) => L.push(row([isAnon() ? `ログ${i+1}` : s.name, s.n, fmtSpan(s)])));
+    L.push('');
+    if(MERGE && MERGE.dupes) L.push(`> 同じ発言 ${MERGE.dupes}件を重複として除いています。`);
+    if(MERGE && MERGE.gap > 0) L.push(`> ファイルごとに期間が違います（ずれ 約${MERGE.gap}日）。重なっていない期間では、月ごとの増減とイベント前後の比較が実態とずれます。`);
+    if(SOURCES.length > 1) L.push(`> 会話の続きとみなす判定は、同じログの中だけで行っています。`);
+    L.push('');
+  }
 
   L.push(`## 1. 全体の数字`, '');
   L.push(row(['発言した人数', '発言', '発言があった日', '中核が占める割合']), sep(4),
